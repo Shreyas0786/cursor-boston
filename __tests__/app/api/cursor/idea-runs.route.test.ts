@@ -215,6 +215,148 @@ describe("Cursor idea runs API", () => {
     expect(docs.get("run-1")).toMatchObject({ status: "cancelled" });
   });
 
+  it("cancel returns 401 when unauthenticated", async () => {
+    mockGetVerifiedUser.mockResolvedValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    const res = await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(res.status).toBe(401);
+  });
+
+  it("cancel returns 500 when admin db is null", async () => {
+    const fbAdmin = require("@/lib/firebase-admin");
+    fbAdmin.getAdminDb.mockReturnValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    const res = await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(res.status).toBe(500);
+  });
+
+  it("cancel returns 404 when run not found", async () => {
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/ghost/cancel", "POST"),
+      params("ghost"),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("cancel skips cursor API call for terminal-status runs", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "finished", // terminal
+      cursorAgentId: "bc-agent-1",
+      cursorRunId: "run-sdk-1",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    const res = await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(res.status).toBe(200);
+    // Terminal status → no cancel SDK call
+    expect(mockCancelCursorRun).not.toHaveBeenCalled();
+    // Still marks the doc cancelled
+    expect(docs.get("run-1")).toMatchObject({ status: "cancelled" });
+  });
+
+  it("cancel skips cursor API call when no cursorAgentId is present", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "running",
+      // No cursorAgentId
+      cursorRunId: "run-sdk-1",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    const res = await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(res.status).toBe(200);
+    expect(mockCancelCursorRun).not.toHaveBeenCalled();
+  });
+
+  it("cancel uses questionRunId when workflowStage='questions'", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "running",
+      workflowStage: "questions",
+      cursorAgentId: "bc-agent-1",
+      questionRunId: "question-run-1",
+      cursorRunId: "run-sdk-1", // ignored
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(mockCancelCursorRun).toHaveBeenCalledWith("cursor-key", "bc-agent-1", "question-run-1");
+  });
+
+  it("cancel uses planRunId when workflowStage='planning'", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "running",
+      workflowStage: "planning",
+      cursorAgentId: "bc-agent-1",
+      planRunId: "plan-run-1",
+      cursorRunId: "run-sdk-1", // would be ignored
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(mockCancelCursorRun).toHaveBeenCalledWith("cursor-key", "bc-agent-1", "plan-run-1");
+  });
+
+  it("cancel uses buildRunId when workflowStage='building'", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "running",
+      workflowStage: "building",
+      cursorAgentId: "bc-agent-1",
+      buildRunId: "build-run-1",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(mockCancelCursorRun).toHaveBeenCalledWith("cursor-key", "bc-agent-1", "build-run-1");
+  });
+
+  it("cancel uses prRunId when workflowStage='pr_open'", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "running",
+      workflowStage: "pr_open",
+      cursorAgentId: "bc-agent-1",
+      prRunId: "pr-run-1",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(mockCancelCursorRun).toHaveBeenCalledWith("cursor-key", "bc-agent-1", "pr-run-1");
+  });
+
+  it("cancel returns 500 'cancel_failed' when cancelCursorRun throws", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "running",
+      cursorAgentId: "bc-agent-1",
+      cursorRunId: "run-sdk-1",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    mockCancelCursorRun.mockRejectedValueOnce(new Error("cursor api down"));
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/cancel/route");
+    const res = await POST(request("/api/cursor/idea-runs/run-1/cancel", "POST"), params("run-1"));
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ error: "cancel_failed" });
+  });
+
   it("archives the backing Cursor agent", async () => {
     docs.set("run-1", {
       userId: "user-1",
@@ -279,6 +421,160 @@ describe("Cursor idea runs API", () => {
       questionRunId: "follow-up-1",
       questions: [],
     });
+  });
+
+  it("answers returns 401 when unauthenticated", async () => {
+    mockGetVerifiedUser.mockResolvedValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/answers/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/answers", "POST", { answers: {} }),
+      params("run-1"),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("answers returns 500 when admin db is null", async () => {
+    const fbAdmin = require("@/lib/firebase-admin");
+    fbAdmin.getAdminDb.mockReturnValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/answers/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/answers", "POST", { answers: {} }),
+      params("run-1"),
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("answers returns 400 on invalid JSON body", async () => {
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/answers/route");
+    const req = new NextRequest("http://localhost/api/cursor/idea-runs/run-1/answers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json",
+    });
+    const res = await POST(req, params("run-1"));
+    expect(res.status).toBe(400);
+  });
+
+  it("answers returns 404 when run missing or selectedIdea absent", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "running",
+      workflowStage: "questions",
+      cursorAgentId: "bc-agent-1",
+      questions: [{ id: "q1", question: "?", suggestions: [] }],
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/answers/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/answers", "POST", { answers: { q1: "yes" } }),
+      params("run-1"),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("answers returns 409 'agent_recovery_required' when sendCursorFollowUp throws", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "running",
+      workflowStage: "questions",
+      cursorAgentId: "bc-agent-1",
+      selectedIdea: "Refactor",
+      questions: [{ id: "q1", question: "Scope?", suggestions: ["small"] }],
+      prompt: "Prompt",
+      inputs: {},
+    });
+    mockSendCursorFollowUp.mockRejectedValueOnce(new Error("cursor api down"));
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/answers/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/answers", "POST", { answers: { q1: "small" } }),
+      params("run-1"),
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: "agent_recovery_required" });
+  });
+
+  it("questions returns 401 when unauthenticated", async () => {
+    mockGetVerifiedUser.mockResolvedValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/questions/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/questions", "POST", { selectedIdea: "x" }),
+      params("run-1"),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("questions returns 500 when admin db is null", async () => {
+    const fbAdmin = require("@/lib/firebase-admin");
+    fbAdmin.getAdminDb.mockReturnValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/questions/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/questions", "POST", { selectedIdea: "x" }),
+      params("run-1"),
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("questions returns 400 on invalid JSON body", async () => {
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/questions/route");
+    const req = new NextRequest("http://localhost/api/cursor/idea-runs/run-1/questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json",
+    });
+    const res = await POST(req, params("run-1"));
+    expect(res.status).toBe(400);
+  });
+
+  it("questions returns 400 on schema rejection (no selectedIdea)", async () => {
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/questions/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/questions", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("questions returns 404 when run missing or has no cursorAgentId", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "finished",
+      workflowStage: "ideas",
+      // No cursorAgentId
+      result: "Idea list",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/questions/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/questions", "POST", { selectedIdea: "x" }),
+      params("run-1"),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("questions returns 409 'agent_recovery_required' when sendCursorFollowUp throws", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "finished",
+      workflowStage: "ideas",
+      cursorAgentId: "bc-agent-1",
+      result: "Idea list",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    mockSendCursorFollowUp.mockRejectedValueOnce(new Error("cursor api down"));
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/questions/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/questions", "POST", { selectedIdea: "x" }),
+      params("run-1"),
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: "agent_recovery_required" });
   });
 
   it("rejects questions before ideas are ready", async () => {
@@ -415,6 +711,94 @@ describe("Cursor idea runs API", () => {
     });
   });
 
+  it("approve-plan returns 401 when unauthenticated", async () => {
+    mockGetVerifiedUser.mockResolvedValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/approve-plan/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/approve-plan", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("approve-plan returns 500 when admin db is null", async () => {
+    const fbAdmin = require("@/lib/firebase-admin");
+    fbAdmin.getAdminDb.mockReturnValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/approve-plan/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/approve-plan", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("approve-plan returns 404 when run missing or buildPlan absent", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "finished",
+      workflowStage: "plan_approval",
+      cursorAgentId: "bc-agent-1",
+      // No buildPlan
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/approve-plan/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/approve-plan", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("approve-plan falls back to launchCursorAgentRun when sendCursorFollowUp throws", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "finished",
+      workflowStage: "plan_approval",
+      cursorAgentId: "bc-agent-1",
+      buildPlan: "## Plan",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    mockSendCursorFollowUp.mockRejectedValueOnce(new Error("follow-up failed"));
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/approve-plan/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/approve-plan", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(202);
+    expect(mockLaunchCursorAgentRun).toHaveBeenCalled();
+    expect(docs.get("run-1")).toMatchObject({
+      cursorAgentId: "bc-agent-fresh",
+      buildRunId: "fresh-run-1",
+      workflowStage: "building",
+    });
+  });
+
+  it("approve-plan returns 500 'approval_failed' when both follow-up and fresh agent fail", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "finished",
+      workflowStage: "plan_approval",
+      cursorAgentId: "bc-agent-1",
+      buildPlan: "## Plan",
+      prompt: "Prompt",
+      inputs: {},
+    });
+    mockSendCursorFollowUp.mockRejectedValueOnce(new Error("follow-up failed"));
+    mockLaunchCursorAgentRun.mockRejectedValueOnce(new Error("fresh agent failed"));
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/approve-plan/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/approve-plan", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ error: "approval_failed" });
+  });
+
   it("opens a PR after build readiness", async () => {
     docs.set("run-1", {
       userId: "user-1",
@@ -446,6 +830,69 @@ describe("Cursor idea runs API", () => {
       prRunId: "follow-up-1",
       pr: { status: "opening", openedAt: "SERVER_TIME" },
     });
+  });
+
+  it("open-pr returns 401 when unauthenticated", async () => {
+    mockGetVerifiedUser.mockResolvedValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/open-pr/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/open-pr", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("open-pr returns 500 when admin db is null", async () => {
+    const fbAdmin = require("@/lib/firebase-admin");
+    fbAdmin.getAdminDb.mockReturnValueOnce(null);
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/open-pr/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/open-pr", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("open-pr returns 404 when run is missing or has no cursorAgentId", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "finished",
+      workflowStage: "ready_for_pr",
+      // No cursorAgentId
+      buildResult: "Built",
+      pr: { status: "not_started" },
+      prompt: "Prompt",
+      inputs: {},
+    });
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/open-pr/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/open-pr", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("open-pr returns 500 'open_pr_failed' when sendCursorFollowUp throws", async () => {
+    docs.set("run-1", {
+      userId: "user-1",
+      type: "pr_ideas",
+      status: "finished",
+      workflowStage: "ready_for_pr",
+      cursorAgentId: "bc-agent-1",
+      buildResult: "Built",
+      pr: { status: "not_started" },
+      prompt: "Prompt",
+      inputs: {},
+    });
+    mockSendCursorFollowUp.mockRejectedValueOnce(new Error("cursor api down"));
+    const { POST } = await import("@/app/api/cursor/idea-runs/[runId]/open-pr/route");
+    const res = await POST(
+      request("/api/cursor/idea-runs/run-1/open-pr", "POST", {}),
+      params("run-1"),
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ error: "open_pr_failed" });
   });
 
   it("rejects opening a PR before the build is ready", async () => {
