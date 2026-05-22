@@ -12,12 +12,17 @@ import {
   withSecurityMiddleware,
 } from "@/lib/middleware";
 import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
+import { checkUpstashRateLimit } from "@/lib/upstash-rate-limit";
 import { logger } from "@/lib/logger";
 
 jest.mock("@/lib/rate-limit", () => ({
   ...jest.requireActual("@/lib/rate-limit"),
   checkRateLimit: jest.fn(),
   getClientIdentifier: jest.fn(() => "ip:127.0.0.1"),
+}));
+
+jest.mock("@/lib/upstash-rate-limit", () => ({
+  checkUpstashRateLimit: jest.fn(),
 }));
 
 jest.mock("@/lib/logger", () => ({
@@ -30,6 +35,9 @@ jest.mock("@/lib/logger", () => ({
 }));
 
 const mockRateLimit = checkRateLimit as jest.MockedFunction<typeof checkRateLimit>;
+const mockUpstashRateLimit = checkUpstashRateLimit as jest.MockedFunction<
+  typeof checkUpstashRateLimit
+>;
 
 function makeRequest(opts: {
   method?: string;
@@ -254,6 +262,78 @@ describe("withRateLimitMiddleware", () => {
     expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
     expect(handler).not.toHaveBeenCalled();
   });
+
+  it("uses distributed rate limiting when requested", async () => {
+    mockUpstashRateLimit.mockResolvedValue({
+      success: true,
+      remaining: 4,
+      resetTime: 22222,
+    } as any);
+
+    const handler = okHandler();
+    const options = { windowMs: 60_000, maxRequests: 10 };
+    const wrapped = withRateLimitMiddleware(options, handler, {
+      distributed: true,
+      failMode: "closed",
+    });
+    const res = await wrapped(makeRequest({ method: "POST" }));
+
+    expect(res.status).toBe(200);
+    expect(mockRateLimit).not.toHaveBeenCalled();
+    expect(mockUpstashRateLimit).toHaveBeenCalledWith("ip:127.0.0.1", options, {
+      failMode: "closed",
+    });
+    expect(res.headers.get("X-RateLimit-Remaining")).toBe("4");
+  });
+
+  it("returns 503 when distributed fail-closed rate limiting is unavailable", async () => {
+    mockUpstashRateLimit.mockResolvedValue({
+      success: false,
+      remaining: 0,
+      resetTime: 99999,
+      retryAfter: 45,
+      reason: "rate_limit_unavailable",
+    } as any);
+
+    const handler = okHandler();
+    const wrapped = withRateLimitMiddleware(
+      { windowMs: 60_000, maxRequests: 10 },
+      handler,
+      { distributed: true, failMode: "closed" }
+    );
+    const res = await wrapped(makeRequest({ method: "POST" }));
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("45");
+    expect(await res.json()).toMatchObject({
+      error: "Rate limit unavailable",
+      retryAfter: 45,
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 for distributed quota denials", async () => {
+    mockUpstashRateLimit.mockResolvedValue({
+      success: false,
+      remaining: 0,
+      resetTime: 99999,
+      retryAfter: 30,
+      reason: "rate_limited",
+    } as any);
+
+    const handler = okHandler();
+    const wrapped = withRateLimitMiddleware(
+      { windowMs: 60_000, maxRequests: 10 },
+      handler,
+      { distributed: true, failMode: "closed" }
+    );
+    const res = await wrapped(makeRequest({ method: "POST" }));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("30");
+    expect(await res.json()).toMatchObject({ error: "Too many requests" });
+    expect(handler).not.toHaveBeenCalled();
+  });
 });
 
 describe("withLoggingMiddleware", () => {
@@ -315,13 +395,13 @@ describe("withLoggingMiddleware", () => {
     expect(logger.logError).toHaveBeenCalled();
   });
 
-  it("captures the client IP from x-forwarded-for (first value)", async () => {
+  it("captures the trusted client IP from x-forwarded-for", async () => {
     const handler = okHandler();
     const wrapped = withLoggingMiddleware(handler);
     await wrapped(
       makeRequest({
         method: "GET",
-        headers: { "x-forwarded-for": "203.0.113.42, 10.0.0.1" },
+        headers: { "x-forwarded-for": "203.0.113.200, 203.0.113.42" },
       })
     );
     expect(logger.info).toHaveBeenCalledWith(
@@ -330,13 +410,16 @@ describe("withLoggingMiddleware", () => {
     );
   });
 
-  it("falls back to x-real-ip when x-forwarded-for is absent", async () => {
+  it("prefers x-vercel-forwarded-for over x-forwarded-for", async () => {
     const handler = okHandler();
     const wrapped = withLoggingMiddleware(handler);
     await wrapped(
       makeRequest({
         method: "GET",
-        headers: { "x-real-ip": "203.0.113.99" },
+        headers: {
+          "x-vercel-forwarded-for": "203.0.113.99",
+          "x-forwarded-for": "198.51.100.200, 10.0.0.1",
+        },
       })
     );
     expect(logger.info).toHaveBeenCalledWith(
