@@ -31,6 +31,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Code2,
   FlaskConical,
   GraduationCap,
   HelpCircle,
@@ -135,6 +136,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Needs Work",
     items: [
       { href: "/hackathons", label: "Hackathons", icon: Trophy },
+      { href: "/challenges", label: "Challenges", icon: Code2 },
       { href: "/showcase", label: "Showcase", icon: LayoutGrid },
       { href: "/members", label: "Members", icon: Users },
       { href: "/pair", label: "Pair Programming", icon: UsersRound },

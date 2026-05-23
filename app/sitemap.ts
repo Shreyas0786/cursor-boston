@@ -7,6 +7,7 @@
 
 import { MetadataRoute } from 'next';
 import { getAllPostSlugs } from '@/lib/blog';
+import { MONTHLY_CHALLENGES } from '@/lib/monthly-challenges';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-templates';
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -65,6 +66,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: 'daily',
       priority: 0.72,
+    },
+    {
+      url: `${baseUrl}/challenges`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.7,
     },
     {
       url: `${baseUrl}/talks`,
@@ -204,6 +211,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
+  const challengePages: MetadataRoute.Sitemap = MONTHLY_CHALLENGES.map((challenge) => ({
+    url: `${baseUrl}/challenges/${challenge.id}`,
+    lastModified,
+    changeFrequency: challenge.status === 'current' ? 'weekly' : 'monthly',
+    priority: challenge.status === 'current' ? 0.68 : 0.5,
+  }));
+
   const templatePages: MetadataRoute.Sitemap = PROMPT_TEMPLATES.map((template) => ({
     url: `${baseUrl}/templates/${template.id}`,
     lastModified,
@@ -211,5 +225,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...blogPages, ...templatePages];
+  return [...staticPages, ...blogPages, ...challengePages, ...templatePages];
 }
