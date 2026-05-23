@@ -425,6 +425,12 @@ _Talk-submission moderation queue._
 | GET | `/api/hiring-partners/apply` | Yes | Get the current user's hiring-partner application |
 | POST | `/api/hiring-partners/apply` | Yes | Create or update the current user's hiring-partner application |
 
+## MonthlyChallenges
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/challenges/{challengeId}/submissions` | Yes | Create a monthly challenge submission draft or submitted entry |
+
 ## NotifyAdmin
 
 | Method | Endpoint | Auth | Description |

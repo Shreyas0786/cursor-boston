@@ -40,6 +40,7 @@ import { ludwittContract } from "./ludwitt";
 import { maintainersContract } from "./maintainers";
 import { membersContract } from "./members";
 import { mentorshipContract } from "./mentorship";
+import { monthlyChallengesContract } from "./monthly-challenges";
 import { notificationsContract } from "./notifications";
 import { notifyAdminContract } from "./notify-admin";
 import { pairContract } from "./pair";
@@ -77,6 +78,7 @@ export const apiContract = c.router({
   maintainers: maintainersContract,
   members: membersContract,
   mentorship: mentorshipContract,
+  monthlyChallenges: monthlyChallengesContract,
   notifications: notificationsContract,
   notifyAdmin: notifyAdminContract,
   pair: pairContract,
