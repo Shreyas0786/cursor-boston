@@ -7,6 +7,7 @@
 
 import { MetadataRoute } from 'next';
 import { getAllPostSlugs } from '@/lib/blog';
+import { getPublishedPairRecordings } from '@/lib/pair-recordings';
 import { MONTHLY_CHALLENGES } from '@/lib/monthly-challenges';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-templates';
 
@@ -128,6 +129,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.6,
     },
     {
+      url: `${baseUrl}/recordings`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    },
+    {
       url: `${baseUrl}/badges`,
       lastModified,
       changeFrequency: 'weekly',
@@ -211,6 +218,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
+  const recordingPages: MetadataRoute.Sitemap = getPublishedPairRecordings().map(
+    (recording) => ({
+      url: `${baseUrl}/recordings/${recording.id}`,
+      lastModified,
+      changeFrequency: 'monthly' as const,
+      priority: 0.55,
+    }),
+  );
+
+
   const challengePages: MetadataRoute.Sitemap = MONTHLY_CHALLENGES.map((challenge) => ({
     url: `${baseUrl}/challenges/${challenge.id}`,
     lastModified,
@@ -225,5 +242,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...blogPages, ...challengePages, ...templatePages];
+
+  return [...staticPages, ...blogPages, ...challengePages, ...templatePages, ...recordingPages];
 }
