@@ -36,6 +36,7 @@ import {
   HelpCircle,
   Info,
   LayoutGrid,
+  LibraryBig,
   LogIn,
   Menu,
   MessageSquare,
@@ -85,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/events", label: "Events", icon: Calendar },
       { href: "/cookbook", label: "Cookbook", icon: ChefHat },
+      { href: "/templates", label: "Templates", icon: LibraryBig },
       { href: "/questions", label: "Q&A", icon: HelpCircle },
       { href: "/pr-ideas", label: "PR Studio", icon: Bot },
       { href: "/opportunities", label: "Opportunities", icon: Briefcase },
