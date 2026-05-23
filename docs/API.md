@@ -445,6 +445,12 @@ _Talk-submission moderation queue._
 |--------|----------|------|-------------|
 | POST | `/api/templates` | Yes | Create a private prompt template draft or pending-review template |
 
+## Skills
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/skills/progress` | Yes | Get the current user'"'"'s Skills Passport progress |
+
 ## SummerCohort
 
 | Method | Endpoint | Auth | Description |
