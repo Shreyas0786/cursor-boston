@@ -1,0 +1,7 @@
+{
+  "score": 8,
+  "rationale": "Sharp, actionable insight stated up front — Gillette Stadium isn't in Boston (30 mi south); Route 1 to Foxborough is one of MA's deadlier corridors, so take the Foxboro Commuter Rail on match days. Uses MBTA Open Data (competition dataset) deeply via live api-v3.mbta.com calls for stops, routes, vehicles, and shapes, layered with MassDOT IMPACT crash data. Marimo reactivity is purposeful — match picker, location input, severity multiselect, mo.stop gates that unlock the full guide only after the user commits to a match — not just used as a Jupyter substitute. Strength: polished, contrarian, genuinely useful, tourist-facing product with weather/transit/hotels/crime/crash overlays. Weakness: the headline analytical finding (Route 1 crash density) is built more on MassDOT than on the MBTA competition dataset; MBTA is engaged deeply but as the transit-visualization surface, not the source of the insight itself.",
+  "model": "manual-review-claude-code-2026-05-25",
+  "scoredAt": "2026-05-25T15:50:00Z",
+  "scorerVersion": 1
+}
