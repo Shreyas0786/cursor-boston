@@ -99,7 +99,11 @@ SPDX-License-Identifier = "GPL-3.0-only"
 # a project-level credit line; the git history is authoritative for
 # per-file authorship.
 [[annotations]]
-path = ["pydata-2026-submissions/**", "hack-a-sprint-2026-submissions/**"]
+path = [
+    "pydata-2026-submissions/**",
+    "hack-a-sprint-2026-submissions/**",
+    "sports-hack-2026-submissions/**",
+]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Cursor Boston hackathon contributors"
 SPDX-License-Identifier = "GPL-3.0-only"
