@@ -223,10 +223,42 @@ function renderTerms(frame) {
     button.className = "term";
     button.textContent = term;
     button.addEventListener("click", () => {
-      termDetailEl.textContent = `${term}: ${termDictionary[term] || "Definition coming soon."}`;
+      const contextText = buildTermContext(term, frame);
+      termDetailEl.textContent = contextText;
     });
     termPanelEl.appendChild(button);
   });
+}
+
+function getNearestCommentatorMoment(frame) {
+  if (frame.speaker === "commentator") {
+    return frame;
+  }
+
+  for (let i = state.index; i >= 0; i -= 1) {
+    if (moments[i].speaker === "commentator") {
+      return moments[i];
+    }
+  }
+
+  for (let i = state.index + 1; i < moments.length; i += 1) {
+    if (moments[i].speaker === "commentator") {
+      return moments[i];
+    }
+  }
+
+  return null;
+}
+
+function buildTermContext(term, frame) {
+  const definition = termDictionary[term] || "Definition coming soon.";
+  const anchor = getNearestCommentatorMoment(frame);
+
+  if (!anchor) {
+    return `${term}: ${definition} Current game context: ${frame.segment} (${frame.quarterClock}). No commentator line is available yet for this moment.`;
+  }
+
+  return `${term}: ${definition} Game context: ${frame.segment} (${frame.quarterClock}, ${frame.score.home}-${frame.score.away}). Commentator evidence: "${anchor.subtitle}" Visual evidence: ${anchor.courtFrame}. In this possession window, the term is used to explain the tactical decision happening on court.`;
 }
 
 function renderTop(frame) {
