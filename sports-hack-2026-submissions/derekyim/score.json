@@ -1,7 +1,7 @@
 {
   "ai": {
     "score": 8,
-    "rationale": "Sharp, complete jumbotron fan-cam concept tied to a specific team (Celtics): QR → selfie → Green/Mean → Claude Vision scoring energy/spirit/originality → AI-generated PA-announcer roast lines → operator dashboard queues winners for the big screen. Real multimodal AI use, two-surface product (audience + operator), and all URLs present including a slide deck. Slight knock for the ngrok-hosted deploy (transient rather than a permanent URL), and the entertainment-only use case caps it short of the top tier, but the depth of build for one day is clearly above the median.",
+    "rationale": "Most production-shaped of the 8s — a two-surface product (audience-facing fan cam + operator dashboard that queues winners for the jumbotron) tied to a specific team. QR → selfie → Claude Vision scoring across energy/Celtics-spirit/originality → AI-generated PA-announcer roast lines is a credible live-event flow. Real multimodal AI use, all three URLs present plus a slide deck. Held under the top three because the deploy is ngrok-hosted (transient rather than a permanent URL) and the use case is entertainment-only — no analytics or coaching value beyond the moment.",
     "model": "claude-opus-4-7",
     "scoredAt": "2026-05-26T19:04:00.000Z",
     "scorerVersion": 2

@@ -1,9 +1,9 @@
 {
   "ai": {
-    "score": 8,
-    "rationale": "Sharp, specific pitch: vision-only race-engineer coaching for karting/moto/cycling with timestamped braking and racing-line feedback — a real differentiator vs sensor-based products. Genuine multimodal AI leverage (Gemini 2.5 Flash for video + Groq LLaMA), all three URLs filled in (Vimeo + repo + Streamlit deploy). Loses a point because the demo is a single-flow Streamlit app rather than something with sample outputs or evaluation built in, but for a one-day build this is well-scoped and clearly shipped.",
+    "score": 8.5,
+    "rationale": "Strongest technical bet in the field — pure computer vision over race footage to surface braking errors, racing-line issues, and best moments with timestamps, no sensors required. Multi-sport coverage (karting + motorcycle + road cycling) shows genuine generality rather than a one-track demo. Named tech stack (Gemini 2.5 Flash for video + Groq LLaMA + custom interactive timeline), all three URLs filled (Vimeo + repo + Streamlit deploy). The \"no hardware needed, just video\" framing is a real differentiator vs sensor-based competitors. Slightly held back from 9 because the demo is a single-flow Streamlit app rather than something with sample-output galleries or a measurable accuracy claim, but the technical floor is the highest of the 8-tier.",
     "model": "claude-opus-4-7",
-    "scoredAt": "2026-05-26T18:48:00.000Z",
+    "scoredAt": "2026-05-26T19:04:00.000Z",
     "scorerVersion": 2
   }
 }
