@@ -276,6 +276,70 @@ h3 {
     background: rgba(255, 255, 255, 0.02);
 }
 
+.transcript-list li.commentator-line {
+    border-color: rgba(255, 145, 71, 0.5);
+    background: rgba(255, 145, 71, 0.12);
+}
+
+.transcript-list li.commentator-line .stamp {
+    color: #ffd6b5;
+}
+
+.speaker-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    border: 1px solid rgba(151, 196, 250, 0.35);
+    color: #c6deff;
+}
+
+.speaker-tag.commentator {
+    border-color: rgba(255, 145, 71, 0.55);
+    color: #ffd7b9;
+    background: rgba(255, 145, 71, 0.14);
+}
+
+.commentator-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 10px;
+}
+
+.commentator-badge {
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border: 1px solid rgba(255, 145, 71, 0.55);
+    color: #ffd8bb;
+    background: rgba(255, 145, 71, 0.12);
+}
+
+.vllm-box {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 8px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.vllm-row {
+    margin: 0 0 6px;
+    color: var(--muted);
+    line-height: 1.35;
+}
+
+.vllm-row:last-child {
+    margin-bottom: 0;
+}
+
 .stamp {
     display: inline-block;
     margin-right: 6px;

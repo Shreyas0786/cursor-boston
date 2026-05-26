@@ -73,7 +73,19 @@
             <button id="toggleAuto" class="btn-secondary">Auto: On</button>
           </div>
           <p class="hint">Timestamped subtitles from ASR / official caption feed.</p>
+          <div class="commentator-strip">
+            <span class="commentator-badge">Commentator Voice Separation: Active</span>
+            <span class="hint">Commentator lines are highlighted and prioritized for gameplay analysis.</span>
+          </div>
           <ul class="transcript-list" id="transcriptList"></ul>
+
+          <div class="vllm-box">
+            <p class="label">vLLM Gameplay Input (Commentator + Court Frame)</p>
+            <p class="vllm-row"><strong>Commentator Text:</strong> <span id="vllmCommentary">-</span></p>
+            <p class="vllm-row"><strong>Court Frame Anchor:</strong> <span id="vllmFrame">-</span></p>
+            <p class="vllm-row"><strong>Payload Mode:</strong> Commentary-first tactical reasoning</p>
+          </div>
+
           <div class="terms-box">
             <p class="label">Highlighted Terms</p>
             <div class="terms" id="termPanel"></div>

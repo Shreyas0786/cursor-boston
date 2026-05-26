@@ -6,6 +6,8 @@ const moments = [
     segment: "National Anthem",
     subtitle:
       "Please rise as tonight's anthem singer begins, and both teams line up along the sideline in silence.",
+    speaker: "arena-pa",
+    courtFrame: "CAM-A | center court wide",
     topic: "Ceremonial Opening Moment",
     description:
       "The anthem marks the final pre-tip ceremony before player introductions and opening tip.",
@@ -18,6 +20,8 @@ const moments = [
     segment: "Starting Lineup Introductions",
     subtitle:
       "And now the starting five for Boston, led by their All-Star guard, as the crowd gets noticeably louder.",
+    speaker: "arena-pa",
+    courtFrame: "CAM-B | player tunnel pan",
     topic: "Lineup Reveal and Matchup Setup",
     description:
       "Broadcast focus shifts to opening matchups and expected defensive assignments.",
@@ -30,6 +34,8 @@ const moments = [
     segment: "Active Gameplay",
     subtitle:
       "Boston flows into a high pick-and-roll, draws the switch, and gets a clean pull-up from the elbow.",
+    speaker: "commentator",
+    courtFrame: "CAM-C | half-court tactical view",
     topic: "Early Pick-and-Roll Execution",
     description:
       "The offense is testing switch coverage and targeting mid-range space behind the screen.",
@@ -42,6 +48,8 @@ const moments = [
     segment: "Timeout and Bench Discussion",
     subtitle:
       "Timeout called by New York. The coach is drawing up a sideline out-of-bounds set for the next possession.",
+    speaker: "commentator",
+    courtFrame: "CAM-D | bench close-up",
     topic: "Set-Play Adjustment During Timeout",
     description:
       "Both benches are adjusting pace and play-calling before the final two minutes of the half.",
@@ -54,6 +62,8 @@ const moments = [
     segment: "Replay and Slow-Motion Highlight",
     subtitle:
       "Replay shows the weak-side help arriving late, leaving the corner shooter completely unmarked.",
+    speaker: "commentator",
+    courtFrame: "CAM-E | replay telestration",
     topic: "Defensive Rotation Breakdown",
     description:
       "The production team uses slow motion to explain why the corner three was available.",
@@ -66,6 +76,8 @@ const moments = [
     segment: "Halftime Show",
     subtitle:
       "The halftime dance crew takes center court while the broadcast teases second-half adjustments.",
+    speaker: "sideline",
+    courtFrame: "CAM-F | center court stage",
     topic: "Entertainment Break Between Halves",
     description:
       "Halftime show content keeps fan engagement high while analysts prepare tactical recap.",
@@ -78,6 +90,8 @@ const moments = [
     segment: "Final Moments / Clutch Time",
     subtitle:
       "Boston gets a stop, pushes in transition, and forces contact at the rim with 1:11 to play.",
+    speaker: "commentator",
+    courtFrame: "CAM-G | full-court tracking",
     topic: "Clutch Transition Decision-Making",
     description:
       "Late-game possessions are being decided by defensive rebounds and quick attacks before help arrives.",
@@ -90,6 +104,8 @@ const moments = [
     segment: "Game End and Player Celebration",
     subtitle:
       "Final buzzer sounds. Boston players celebrate at center court after closing on a 9-4 run.",
+    speaker: "commentator",
+    courtFrame: "CAM-H | final buzzer wide",
     topic: "Game End Result and Closing Run",
     description:
       "The game ends with a defensive stand and controlled final-possession execution.",
@@ -152,6 +168,14 @@ const askBtnEl = document.getElementById("askBtn");
 const answerBoxEl = document.getElementById("answerBox");
 const timelineEl = document.getElementById("timeline");
 const confidencePillEl = document.getElementById("confidencePill");
+const vllmCommentaryEl = document.getElementById("vllmCommentary");
+const vllmFrameEl = document.getElementById("vllmFrame");
+
+const speakerLabel = {
+  commentator: "Commentator",
+  "arena-pa": "Arena PA",
+  sideline: "Sideline",
+};
 
 const suggestionPrompts = [
   "What does this subtitle tell us tactically?",
@@ -170,12 +194,26 @@ function highlightTerms(text, terms) {
 
 function pushTranscript(frame) {
   const li = document.createElement("li");
-  li.innerHTML = `<span class="stamp">${frame.ts}</span><p>${highlightTerms(frame.subtitle, frame.terms)}</p>`;
+  const speaker = frame.speaker || "commentator";
+  const tagClass = speaker === "commentator" ? "speaker-tag commentator" : "speaker-tag";
+  li.classList.toggle("commentator-line", speaker === "commentator");
+  li.innerHTML = `<span class="stamp">${frame.ts}</span><span class="${tagClass}">${speakerLabel[speaker] || "Feed"}</span><p>${highlightTerms(frame.subtitle, frame.terms)}</p>`;
   transcriptListEl.prepend(li);
 
   while (transcriptListEl.children.length > 8) {
     transcriptListEl.removeChild(transcriptListEl.lastChild);
   }
+}
+
+function updateVllmPayload(frame) {
+  if (frame.speaker === "commentator") {
+    vllmCommentaryEl.textContent = frame.subtitle;
+    vllmFrameEl.textContent = `${frame.ts} · ${frame.courtFrame}`;
+    return;
+  }
+
+  vllmCommentaryEl.textContent = "No commentator line in this moment. Waiting for the next tactical commentary segment.";
+  vllmFrameEl.textContent = `${frame.ts} · ${frame.courtFrame}`;
 }
 
 function renderTerms(frame) {
@@ -304,6 +342,7 @@ function nextMoment() {
   renderTop(frame);
   renderTerms(frame);
   pushTranscript(frame);
+  updateVllmPayload(frame);
 }
 
 function askQuestion() {
@@ -356,6 +395,7 @@ function initialize() {
   renderTerms(first);
   transcriptListEl.innerHTML = "";
   pushTranscript(first);
+  updateVllmPayload(first);
 
   timelineEl.innerHTML = "<li><strong>System</strong> · Timeline evidence will appear after the first AI answer.</li>";
   appendChat("System", "Welcome to PulseLens Broadcast Mock. Ask anything about the live moment.");
