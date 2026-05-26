@@ -5,7 +5,7 @@ const moments = [
     score: { home: 0, away: 0 },
     segment: "National Anthem",
     subtitle:
-      "Please rise as tonight's anthem singer begins, and both teams line up along the sideline in silence.",
+      "Ladies and gentlemen, please rise for the national anthem as both teams stand along the sideline.",
     speaker: "arena-pa",
     courtFrame: "CAM-A | center court wide",
     topic: "Ceremonial Opening Moment",
@@ -19,7 +19,7 @@ const moments = [
     score: { home: 0, away: 0 },
     segment: "Starting Lineup Introductions",
     subtitle:
-      "And now the starting five for Boston, led by their All-Star guard, as the crowd gets noticeably louder.",
+      "And now your Boston starting five, led by their All-Star guard, and you can hear this building come alive.",
     speaker: "arena-pa",
     courtFrame: "CAM-B | player tunnel pan",
     topic: "Lineup Reveal and Matchup Setup",
@@ -33,7 +33,7 @@ const moments = [
     score: { home: 12, away: 9 },
     segment: "Active Gameplay",
     subtitle:
-      "Boston flows into a high pick-and-roll, draws the switch, and gets a clean pull-up from the elbow.",
+      "Boston goes high pick-and-roll, gets the switch they want, and that's a clean elbow jumper right there.",
     speaker: "commentator",
     courtFrame: "CAM-C | half-court tactical view",
     topic: "Early Pick-and-Roll Execution",
@@ -47,7 +47,7 @@ const moments = [
     score: { home: 41, away: 39 },
     segment: "Timeout and Bench Discussion",
     subtitle:
-      "Timeout called by New York. The coach is drawing up a sideline out-of-bounds set for the next possession.",
+      "Timeout New York. It looks like they're setting up a sideline out-of-bounds action coming out of the break.",
     speaker: "commentator",
     courtFrame: "CAM-D | bench close-up",
     topic: "Set-Play Adjustment During Timeout",
@@ -61,7 +61,7 @@ const moments = [
     score: { home: 44, away: 42 },
     segment: "Replay and Slow-Motion Highlight",
     subtitle:
-      "Replay shows the weak-side help arriving late, leaving the corner shooter completely unmarked.",
+      "On the replay, weak-side help is late, and that leaves the corner shooter wide open for three.",
     speaker: "commentator",
     courtFrame: "CAM-E | replay telestration",
     topic: "Defensive Rotation Breakdown",
@@ -75,7 +75,7 @@ const moments = [
     score: { home: 52, away: 49 },
     segment: "Halftime Show",
     subtitle:
-      "The halftime dance crew takes center court while the broadcast teases second-half adjustments.",
+      "Halftime entertainment is on the floor, and we'll be back with second-half adjustments in just a moment.",
     speaker: "sideline",
     courtFrame: "CAM-F | center court stage",
     topic: "Entertainment Break Between Halves",
@@ -89,7 +89,7 @@ const moments = [
     score: { home: 98, away: 97 },
     segment: "Final Moments / Clutch Time",
     subtitle:
-      "Boston gets a stop, pushes in transition, and forces contact at the rim with 1:11 to play.",
+      "Big defensive stop by Boston, they push in transition, and they draw contact at the rim with 1:11 left.",
     speaker: "commentator",
     courtFrame: "CAM-G | full-court tracking",
     topic: "Clutch Transition Decision-Making",
@@ -103,7 +103,7 @@ const moments = [
     score: { home: 104, away: 101 },
     segment: "Game End and Player Celebration",
     subtitle:
-      "Final buzzer sounds. Boston players celebrate at center court after closing on a 9-4 run.",
+      "Final buzzer. Boston closes on a 9-4 run, and they're celebrating at center court.",
     speaker: "commentator",
     courtFrame: "CAM-H | final buzzer wide",
     topic: "Game End Result and Closing Run",
@@ -170,6 +170,7 @@ const timelineEl = document.getElementById("timeline");
 const confidencePillEl = document.getElementById("confidencePill");
 const vllmCommentaryEl = document.getElementById("vllmCommentary");
 const vllmFrameEl = document.getElementById("vllmFrame");
+const sceneImageEl = document.getElementById("sceneImage");
 
 const speakerLabel = {
   commentator: "Commentator",
@@ -272,6 +273,25 @@ function renderTop(frame) {
   streamTimeEl.textContent = frame.ts;
 }
 
+function slugifySegment(segment) {
+  return segment
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function updateSceneImage(frame) {
+  const index = state.index + 1;
+  const imageName = `scene_${String(index).padStart(2, "0")}_${slugifySegment(frame.segment)}.png`;
+  const imagePath = `mock_stream_images/${imageName}`;
+
+  sceneImageEl.src = imagePath;
+  sceneImageEl.alt = `Generated scene for ${frame.segment}`;
+  sceneImageEl.onerror = () => {
+    sceneImageEl.removeAttribute("src");
+  };
+}
+
 function addTimelineEvidence(frame, confidence) {
   const li = document.createElement("li");
   li.innerHTML = `<strong>${frame.ts}</strong> · Subtitle evidence: ${frame.subtitle}<br>Video anchor: ${frame.ts} - ${shiftTime(frame.ts, 7)} (mock visual lookup)`;
@@ -372,6 +392,7 @@ function nextMoment() {
   progressFillEl.style.width = `${state.progress}%`;
 
   renderTop(frame);
+  updateSceneImage(frame);
   renderTerms(frame);
   pushTranscript(frame);
   updateVllmPayload(frame);
@@ -419,6 +440,7 @@ toggleAutoEl.addEventListener("click", () => {
 function initialize() {
   const first = moments[0];
   renderTop(first);
+  updateSceneImage(first);
   renderTerms(first);
   transcriptListEl.innerHTML = "";
   pushTranscript(first);
