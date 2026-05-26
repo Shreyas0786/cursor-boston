@@ -1,82 +1,127 @@
 const moments = [
   {
-    ts: "00:14:02",
-    quarterClock: "Q4 · 01:32",
-    score: { home: 104, away: 102 },
-    segment: "Pregame Crowd Build-up",
+    ts: "00:01:10",
+    quarterClock: "Pregame",
+    score: { home: 0, away: 0 },
+    segment: "National Anthem",
     subtitle:
-      "The host is asking everyone to count down as arena lights sync with the opening show.",
-    topic: "Pre-tip Emotional Momentum",
+      "Please rise as tonight's anthem singer begins, and both teams line up along the sideline in silence.",
+    topic: "Ceremonial Opening Moment",
     description:
-      "The broadcast is transitioning from entertainment to game focus, and crowd energy is peaking.",
-    terms: ["arena energy", "countdown", "broadcast transition"],
+      "The anthem marks the final pre-tip ceremony before player introductions and opening tip.",
+    terms: ["national anthem", "pregame ceremony", "opening tip"],
   },
   {
-    ts: "00:16:11",
-    quarterClock: "Q4 · 01:08",
-    score: { home: 106, away: 102 },
-    segment: "Commentator Tactical Breakdown",
+    ts: "00:04:32",
+    quarterClock: "Q1 · 12:00",
+    score: { home: 0, away: 0 },
+    segment: "Starting Lineup Introductions",
     subtitle:
-      "The commentator expects Boston to run repeated high pick-and-roll actions to force smaller defenders into switches.",
-    topic: "Crunch-Time Pick-and-Roll Pressure",
+      "And now the starting five for Boston, led by their All-Star guard, as the crowd gets noticeably louder.",
+    topic: "Lineup Reveal and Matchup Setup",
     description:
-      "Boston is targeting mismatch creation in half-court offense while New York tries to protect weak-side spacing.",
-    terms: ["high pick-and-roll", "mismatch", "weak-side"],
+      "Broadcast focus shifts to opening matchups and expected defensive assignments.",
+    terms: ["starting lineup", "matchup", "tip-off"],
   },
   {
-    ts: "00:22:43",
-    quarterClock: "Q4 · 00:47",
-    score: { home: 106, away: 105 },
-    segment: "Fast Break Execution",
+    ts: "00:09:18",
+    quarterClock: "Q1 · 08:44",
+    score: { home: 12, away: 9 },
+    segment: "Active Gameplay",
     subtitle:
-      "A quick transition push creates an open corner three, and New York converts immediately.",
-    topic: "Transition Pace Swing",
+      "Boston flows into a high pick-and-roll, draws the switch, and gets a clean pull-up from the elbow.",
+    topic: "Early Pick-and-Roll Execution",
     description:
-      "A single transition possession shifted momentum and compressed defensive reaction time.",
-    terms: ["transition offense", "corner three", "defensive recovery"],
+      "The offense is testing switch coverage and targeting mid-range space behind the screen.",
+    terms: ["high pick-and-roll", "switch", "mid-range"],
   },
   {
-    ts: "00:35:05",
-    quarterClock: "Q4 · 00:29",
-    score: { home: 108, away: 105 },
-    segment: "Sideline Medical Update",
+    ts: "00:17:40",
+    quarterClock: "Q2 · 05:12",
+    score: { home: 41, away: 39 },
+    segment: "Timeout and Bench Discussion",
     subtitle:
-      "The sideline reporter says the starting forward is under medical evaluation and not expected to return soon.",
-    topic: "Rotation Stress After Injury Report",
+      "Timeout called by New York. The coach is drawing up a sideline out-of-bounds set for the next possession.",
+    topic: "Set-Play Adjustment During Timeout",
     description:
-      "Possible absence of a starter increases bench workload and changes matchup strategy.",
-    terms: ["medical evaluation", "rotation depth", "return timeline"],
+      "Both benches are adjusting pace and play-calling before the final two minutes of the half.",
+    terms: ["timeout", "sideline out-of-bounds", "bench unit"],
   },
   {
-    ts: "00:41:18",
-    quarterClock: "Q4 · 00:08",
-    score: { home: 110, away: 105 },
-    segment: "Closing Possession",
+    ts: "00:19:05",
+    quarterClock: "Q2 · 03:54",
+    score: { home: 44, away: 42 },
+    segment: "Replay and Slow-Motion Highlight",
     subtitle:
-      "Boston wins the final possession battle with a strong paint finish after forcing a turnover.",
-    topic: "Late-Game Possession Control",
+      "Replay shows the weak-side help arriving late, leaving the corner shooter completely unmarked.",
+    topic: "Defensive Rotation Breakdown",
     description:
-      "Final possessions favored Boston through defensive pressure and efficient finishing.",
-    terms: ["turnover pressure", "paint finish", "possession value"],
+      "The production team uses slow motion to explain why the corner three was available.",
+    terms: ["replay", "weak-side help", "corner three"],
+  },
+  {
+    ts: "00:24:30",
+    quarterClock: "Halftime",
+    score: { home: 52, away: 49 },
+    segment: "Halftime Show",
+    subtitle:
+      "The halftime dance crew takes center court while the broadcast teases second-half adjustments.",
+    topic: "Entertainment Break Between Halves",
+    description:
+      "Halftime show content keeps fan engagement high while analysts prepare tactical recap.",
+    terms: ["halftime show", "second-half adjustments", "fan engagement"],
+  },
+  {
+    ts: "00:38:12",
+    quarterClock: "Q4 · 01:11",
+    score: { home: 98, away: 97 },
+    segment: "Final Moments / Clutch Time",
+    subtitle:
+      "Boston gets a stop, pushes in transition, and forces contact at the rim with 1:11 to play.",
+    topic: "Clutch Transition Decision-Making",
+    description:
+      "Late-game possessions are being decided by defensive rebounds and quick attacks before help arrives.",
+    terms: ["clutch time", "transition push", "rim pressure"],
+  },
+  {
+    ts: "00:41:52",
+    quarterClock: "Final",
+    score: { home: 104, away: 101 },
+    segment: "Game End and Player Celebration",
+    subtitle:
+      "Final buzzer sounds. Boston players celebrate at center court after closing on a 9-4 run.",
+    topic: "Game End Result and Closing Run",
+    description:
+      "The game ends with a defensive stand and controlled final-possession execution.",
+    terms: ["final buzzer", "closing run", "postgame reaction"],
   },
 ];
 
 const termDictionary = {
-  "arena energy": "The overall emotional intensity of fans in the venue and online.",
-  countdown: "A synchronized crowd cue often used before key transitions.",
-  "broadcast transition": "A shift from one production segment to another, such as show to gameplay.",
+  "national anthem": "A ceremonial song performed before the game officially begins.",
+  "pregame ceremony": "Formal pregame sequence such as anthem, introductions, and honors.",
+  "opening tip": "The first jump ball that starts play.",
+  "starting lineup": "The first five players each team puts on the court.",
+  matchup: "The direct player-versus-player assignment on offense and defense.",
+  "tip-off": "Another term used in broadcasts for the official game start.",
   "high pick-and-roll": "A screen action near the top of the floor to create driving or switching advantages.",
-  mismatch: "A favorable offensive matchup caused by size, speed, or skill differences.",
-  "weak-side": "The side of the floor away from the ball, often used for spacing and help defense.",
-  "transition offense": "Fast attack immediately after gaining possession before defense is set.",
+  switch: "A defensive exchange where a new defender picks up the ball-handler.",
+  "mid-range": "The scoring area between the paint and the three-point line.",
+  timeout: "A coached stoppage used to reset strategy, tempo, or substitutions.",
+  "sideline out-of-bounds": "A set play executed from a sideline inbound situation.",
+  "bench unit": "The group of non-starters on the floor.",
   "corner three": "A three-point shot from the corner area, usually high-efficiency when open.",
-  "defensive recovery": "How quickly defenders return to position after a transition event.",
-  "medical evaluation": "A real-time health assessment by team medical staff.",
-  "rotation depth": "How many reliable players can sustain team performance.",
-  "return timeline": "Estimated window for an injured player to re-enter the game.",
-  "turnover pressure": "Defensive pressure that increases the chance of ball-loss mistakes.",
-  "paint finish": "Scoring at the rim or inside area near the basket.",
-  "possession value": "Expected scoring impact of a single offensive possession.",
+  replay: "A repeated video segment used to review a previous action.",
+  "weak-side help": "Secondary defensive support from the side away from the ball.",
+  "halftime show": "Entertainment segment during the break between two halves.",
+  "second-half adjustments": "Strategic changes made by coaches after halftime.",
+  "fan engagement": "How actively viewers and attendees interact with the broadcast experience.",
+  "clutch time": "Late-game period when each possession has high impact on the result.",
+  "transition push": "Attacking quickly after a defensive stop before defense is set.",
+  "rim pressure": "Repeated attacks toward the basket to draw fouls or high-value shots.",
+  "final buzzer": "The signal that the game has ended.",
+  "closing run": "A decisive scoring stretch near the end of the game.",
+  "postgame reaction": "Immediate player and crowd response after the final result.",
 };
 
 const state = {
@@ -109,15 +154,15 @@ const timelineEl = document.getElementById("timeline");
 const confidencePillEl = document.getElementById("confidencePill");
 
 const suggestionPrompts = [
-  "Why does the AI call this a mismatch attack?",
-  "What changed after the injury update?",
-  "Which subtitle supports this topic summary?",
+  "What does this subtitle tell us tactically?",
+  "How did halftime change the game flow?",
+  "Which transcript line supports the current AI topic?",
 ];
 
 function highlightTerms(text, terms) {
   let result = text;
   terms.forEach((term) => {
-    const escaped = term.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     result = result.replace(new RegExp(escaped, "gi"), (match) => `<mark>${match}</mark>`);
   });
   return result;
@@ -176,27 +221,48 @@ function shiftTime(ts, plusSeconds) {
 function buildAiAnswer(question, frame) {
   const q = question.toLowerCase();
 
-  if (q.includes("mismatch") || q.includes("pick-and-roll")) {
+  if (q.includes("anthem") || q.includes("ceremony")) {
     return {
       text:
-        "The subtitle at 00:16:11 explicitly mentions high pick-and-roll and switch pressure. That indicates Boston is trying to force weaker on-ball defenders into mismatches on purpose.",
+        "The anthem subtitle marks a ceremonial scene, not tactical play. It confirms the broadcast is still in pregame protocol before lineup announcements and tip-off.",
+      confidence: 93,
+    };
+  }
+
+  if (q.includes("halftime") || q.includes("show")) {
+    return {
+      text:
+        "The halftime subtitle indicates a break in gameplay while the show runs and analysts prepare second-half adjustments. This usually resets pace and substitution planning for Q3.",
+      confidence: 90,
+    };
+  }
+
+  if (
+    q.includes("pick-and-roll") ||
+    q.includes("switch") ||
+    q.includes("tactic") ||
+    q.includes("tactical")
+  ) {
+    return {
+      text:
+        "The gameplay subtitle describes high pick-and-roll usage to trigger a switch. That is a common way to hunt favorable matchups and create cleaner mid-range or paint looks.",
+      confidence: 88,
+    };
+  }
+
+  if (q.includes("replay") || q.includes("highlight") || q.includes("corner three")) {
+    return {
+      text:
+        "The replay subtitle points to late weak-side help, which explains why the corner shooter was uncovered. The slow-motion sequence supports that defensive timing issue.",
+      confidence: 87,
+    };
+  }
+
+  if (q.includes("clutch") || q.includes("final") || q.includes("end")) {
+    return {
+      text:
+        "In clutch time, the transcript highlights transition pressure and rim attacks, then confirms the final buzzer result. The sequence is consistent with a late closing run.",
       confidence: 89,
-    };
-  }
-
-  if (q.includes("injury") || q.includes("return")) {
-    return {
-      text:
-        "At 00:35:05, the sideline report says the starter is under medical evaluation and unlikely to return soon. That pushes extra minutes onto bench players and changes late-game matchups.",
-      confidence: 92,
-    };
-  }
-
-  if (q.includes("transition") || q.includes("corner three")) {
-    return {
-      text:
-        "The transcript at 00:22:43 links a transition push to an open corner three. The likely cause is delayed defensive recovery while defenders are still matching assignments.",
-      confidence: 86,
     };
   }
 
