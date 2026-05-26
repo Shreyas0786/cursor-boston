@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PulseLens Live | AI Sports Stream Companion (Mock Demo)</title>
+    <title>PulseLens Broadcast | AI Live Stream Companion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -18,64 +18,84 @@
     <div class="glow glow-b"></div>
 
     <main class="shell">
-      <header class="hero card reveal">
-        <p class="track">Track 01 · Fan and Audience Experience</p>
-        <h1>PulseLens Live</h1>
-        <p class="sub">
-          把直播字幕变成可理解、可互动、可追溯的实时信息层：场景识别、Breaking News 摘要、术语解释、时轴问答。
-        </p>
-        <div class="hero-meta">
-          <span id="clockBadge">00:14:02</span>
-          <span id="sceneBadge">Scene: Pregame Performance</span>
-          <span id="statusBadge">Live Feed Active</span>
+      <header class="topbar card reveal">
+        <div class="top-item score-box">
+          <p class="label">Live Score</p>
+          <div class="scoreline">
+            <span id="homeTeam">BOS</span>
+            <strong id="homeScore">104</strong>
+            <span class="sep">-</span>
+            <strong id="awayScore">102</strong>
+            <span id="awayTeam">NYK</span>
+          </div>
+          <p class="meta" id="gameClock">Q4 · 01:32</p>
+        </div>
+
+        <div class="top-item">
+          <p class="label">AI Current Topic</p>
+          <h1 id="topicTitle">Crunch-Time Pick-and-Roll Pressure</h1>
+        </div>
+
+        <div class="top-item">
+          <p class="label">Current Description</p>
+          <p class="meta" id="topicDescription">
+            The commentator highlights how Boston is forcing mismatches with high-screen actions while New York struggles to recover to shooters.
+          </p>
         </div>
       </header>
 
-      <section class="layout">
-        <article class="card reveal d1">
-          <div class="row between">
-            <h2>1) Live Subtitle Stream</h2>
-            <button id="nextSubtitle" class="btn">Next Subtitle</button>
+      <section class="main-grid">
+        <article class="card video-panel reveal d1">
+          <div class="row between panel-head">
+            <h2>Live Stream (Mock Video)</h2>
+            <span class="status-dot">LIVE</span>
           </div>
-          <p class="hint">模拟来自 ASR 或官方实时字幕的文本流。</p>
-          <div class="subtitle-box" id="subtitleBox"></div>
-          <div class="row wrap" id="sceneTags"></div>
+          <div class="video-stage">
+            <div class="video-overlay">
+              <p id="overlayTitle">Current Segment: Commentator Analysis</p>
+              <p id="overlaySub">AI watches subtitles + timeline anchors to build context.</p>
+            </div>
+            <button class="play-pill" id="nextMoment">Next Moment</button>
+          </div>
+
+          <div class="video-controls">
+            <span id="streamTime">00:16:11</span>
+            <div class="progress">
+              <div id="progressFill"></div>
+            </div>
+            <span>HD</span>
+          </div>
         </article>
 
-        <article class="card reveal d2">
-          <h2>2) AI Breaking News</h2>
-          <p class="hint">根据当前场景自动生成标题与三句描述，便于快速理解“现在发生了什么”。</p>
-          <div class="news-box">
-            <h3 id="newsTitle"></h3>
-            <ul id="newsBullets"></ul>
+        <article class="card transcript-panel reveal d2">
+          <div class="row between panel-head">
+            <h2>Real-Time Transcription</h2>
+            <button id="toggleAuto" class="btn-secondary">Auto: On</button>
+          </div>
+          <p class="hint">Timestamped subtitles from ASR / official caption feed.</p>
+          <ul class="transcript-list" id="transcriptList"></ul>
+          <div class="terms-box">
+            <p class="label">Highlighted Terms</p>
+            <div class="terms" id="termPanel"></div>
+            <div class="term-detail" id="termDetail">Click any term to see a quick explanation.</div>
           </div>
         </article>
+      </section>
 
-        <article class="card reveal d3">
-          <h2>3) Explainable Terms</h2>
-          <p class="hint">点击术语查看解释；可继续提问获得更深层说明。</p>
-          <div class="terms" id="termPanel"></div>
-          <div class="term-detail" id="termDetail">点击任意术语查看解释。</div>
-        </article>
-
-        <article class="card reveal d4">
-          <h2>4) Ask Anything (Mock RAG + Video Time Anchor)</h2>
-          <p class="hint">系统先匹配字幕，再回到时间轴定位画面片段（vLLM 视觉检索模拟）。</p>
-          <div class="qa">
-            <input id="questionInput" type="text" placeholder="例如：刚才为什么说这是高位挡拆？" />
-            <button id="askBtn" class="btn">Ask</button>
-          </div>
-          <div class="answer" id="answerBox">等待提问...</div>
-        </article>
-
-        <article class="card reveal d5 wide">
-          <div class="row between">
-            <h2>Evidence Timeline</h2>
-            <span class="pill" id="confidencePill">Answer Confidence: -</span>
-          </div>
-          <p class="hint">问答返回会附带字幕证据与视频时间锚点，保证可追溯和可解释。</p>
-          <ul class="timeline" id="timeline"></ul>
-        </article>
+      <section class="chat-wrap card reveal d3">
+        <div class="row between panel-head">
+          <h2>Fan Chat + AI Assistant</h2>
+          <span class="pill" id="confidencePill">Answer Confidence: -</span>
+        </div>
+        <div class="chat-log" id="chatLog"></div>
+        <div class="suggestions" id="suggestions"></div>
+        <div class="qa">
+          <input id="questionInput" type="text" placeholder="Ask: Why is this possession considered a high pick-and-roll?" />
+          <button id="askBtn" class="btn">Send</button>
+        </div>
+        <div class="answer" id="answerBox">Ask a question to retrieve subtitle evidence and timeline anchors.</div>
+        <h3>Evidence Timeline</h3>
+        <ul class="timeline" id="timeline"></ul>
       </section>
     </main>
 
