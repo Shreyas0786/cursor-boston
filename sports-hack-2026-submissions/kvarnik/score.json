@@ -1,0 +1,9 @@
+{
+  "ai": {
+    "score": 7.8,
+    "rationale": "Most imaginative framing among the 8s — multi-agent LLM courtroom (two theatrical lawyers + a warm-hearted judge) settles controversial sports calls into a shareable verdict card. Sharp narrative pitch, all three URLs present (Loom + repo + Vercel deploy), and multi-agent persona-driven argument is a non-trivial AI pattern rather than a single prompt. Lands just below the other 8s because the use case is purely entertainment/social — there's no coaching, analytics, or live-event ops surface, so the ceiling on impact is lower even though the build is complete and well-shipped.",
+    "model": "claude-opus-4-7",
+    "scoredAt": "2026-05-26T19:04:00.000Z",
+    "scorerVersion": 2
+  }
+}

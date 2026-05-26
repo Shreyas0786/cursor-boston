@@ -111,6 +111,12 @@ const config = tseslint.config(
       "build/**",
       "next-env.d.ts",
       "coverage/**",
+      // Hackathon submission folders are independent contributor projects
+      // (own package.json, own path aliases). Don't lint/type-check them as
+      // part of the root project — the root tsconfig excludes them too.
+      "sports-hack-2026-submissions/**",
+      "pydata-2026-submissions/**",
+      "hack-a-sprint-2026-submissions/**",
     ],
   },
 );

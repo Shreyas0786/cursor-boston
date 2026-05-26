@@ -1,0 +1,9 @@
+{
+  "ai": {
+    "score": 9,
+    "rationale": "Clear #1 in the AI track. Contrarian pedagogical thesis — \"AI tutors as question-asking architecture, not answer machines\" — backed by a concrete 2-round structure: athlete states intent, attempts on video, predicts the AI feedback, then sees a Socratic question pointing at one still-frame as evidence; round 2 measures whether the focus from round 1 was actually addressed. Built-in evaluation design is rare for a one-day build. Sport-specific (boxing), all three URLs filled (Loom + repo + Streamlit deploy), multimodal AI use, and explicitly grounded in a named learning-design framework. Stands alone above the rest of the field.",
+    "model": "claude-opus-4-7",
+    "scoredAt": "2026-05-26T19:04:00.000Z",
+    "scorerVersion": 2
+  }
+}
