@@ -142,7 +142,7 @@ const termDictionary = {
 
 const state = {
   index: 0,
-  autoMode: true,
+  autoMode: false,
   autoTimer: null,
   progress: 42,
 };
@@ -396,17 +396,12 @@ function askQuestion() {
 }
 
 function setAutoMode(enabled) {
-  state.autoMode = enabled;
-  toggleAutoEl.textContent = `Auto: ${enabled ? "On" : "Off"}`;
-
+  state.autoMode = false;
   if (state.autoTimer) {
     clearInterval(state.autoTimer);
     state.autoTimer = null;
   }
-
-  if (enabled) {
-    state.autoTimer = setInterval(nextMoment, 6000);
-  }
+  toggleAutoEl.textContent = "Auto: Disabled";
 }
 
 nextMomentEl.addEventListener("click", nextMoment);
@@ -418,7 +413,7 @@ questionInputEl.addEventListener("keydown", (event) => {
 });
 
 toggleAutoEl.addEventListener("click", () => {
-  setAutoMode(!state.autoMode);
+  setAutoMode(false);
 });
 
 function initialize() {
@@ -432,7 +427,7 @@ function initialize() {
   timelineEl.innerHTML = "<li><strong>System</strong> · Timeline evidence will appear after the first AI answer.</li>";
   appendChat("System", "Welcome to PulseLens Broadcast Mock. Ask anything about the live moment.");
   renderSuggestions();
-  setAutoMode(true);
+  setAutoMode(false);
 }
 
 initialize();
