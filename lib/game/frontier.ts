@@ -186,3 +186,196 @@ async function pickByRingWalk(
   }
   return null;
 }
+
+// Walk hex rings outward from `center`, batched-getAll each ring, accumulate
+// unclaimed coords. Stops when we hit `target` unclaimed coords or `maxRing`.
+async function collectUnclaimedByRingWalk(
+  db: Firestore,
+  center: AxialCoord,
+  minRing: number,
+  maxRing: number,
+  target: number,
+  rng: () => number
+): Promise<AxialCoord[]> {
+  const out: AxialCoord[] = [];
+  for (let r = minRing; r <= maxRing && out.length < target; r++) {
+    const coords = ringCoords(center, r);
+    for (let i = coords.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [coords[i], coords[j]] = [coords[j], coords[i]];
+    }
+    if (coords.length === 0) continue;
+    const refs = coords.map((c) =>
+      db.collection(COLLECTIONS.TILES).doc(tileIdFromAxial(c.q, c.r))
+    );
+    const snaps = await db.getAll(...refs);
+    for (let i = 0; i < snaps.length; i++) {
+      if (!snaps[i].exists) out.push(coords[i]);
+      if (out.length >= target) break;
+    }
+  }
+  return out;
+}
+
+// Random sample distinct (ring, slot) coords within `maxRadius` of `center`,
+// batch-getAll each batch, accumulate unclaimed coords. Stops at `target`
+// unclaimed coords or `maxSamples` random tries (whichever first).
+async function collectUnclaimedByMonteCarlo(
+  db: Firestore,
+  center: AxialCoord,
+  maxRadius: number,
+  target: number,
+  maxSamples: number,
+  rng: () => number
+): Promise<AxialCoord[]> {
+  if (maxRadius <= 0) return [];
+  const out: AxialCoord[] = [];
+  const seen = new Set<string>();
+  // Sample in small batches so we can stop early without over-fetching.
+  const BATCH_SIZE = 8;
+  let samplesUsed = 0;
+  while (out.length < target && samplesUsed < maxSamples) {
+    const batch: AxialCoord[] = [];
+    while (batch.length < BATCH_SIZE && samplesUsed < maxSamples) {
+      samplesUsed++;
+      const r = 1 + Math.floor(rng() * maxRadius);
+      const ring = ringCoords(center, r);
+      if (ring.length === 0) continue;
+      const c = ring[Math.floor(rng() * ring.length)];
+      const id = tileIdFromAxial(c.q, c.r);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      batch.push(c);
+    }
+    if (batch.length === 0) break;
+    const refs = batch.map((c) =>
+      db.collection(COLLECTIONS.TILES).doc(tileIdFromAxial(c.q, c.r))
+    );
+    const snaps = await db.getAll(...refs);
+    for (let i = 0; i < snaps.length; i++) {
+      if (!snaps[i].exists) out.push(batch[i]);
+      if (out.length >= target) break;
+    }
+  }
+  return out;
+}
+
+// Pre-fetches up to `count` unclaimed frontier coords + their hostile-neighbor
+// counts via batched getAlls. Pre-threshold uses a centroid ring walk;
+// post-threshold uses Monte Carlo within a radius that grows with
+// `tilesExplored`, falling back to a ring walk over the same radius if the
+// random tries don't fill the batch. The caller claims them in one transaction.
+export async function pickFrontierCandidatesBulk(
+  db: Firestore,
+  userId: string,
+  ownedTileIds: ReadonlyArray<string>,
+  tilesHeld: number,
+  tilesExplored: number,
+  count: number,
+  rng: () => number
+): Promise<FrontierSample[]> {
+  const center = hexCentroid([...ownedTileIds]);
+  const overscan = Math.max(5, Math.ceil(count * 1.5));
+  const useMonteCarlo = tilesExplored >= EXPLORE_MONTE_CARLO_THRESHOLD;
+
+  let unclaimed: AxialCoord[] = [];
+
+  if (!useMonteCarlo) {
+    const minRing = Math.max(1, 1 + Math.floor(tilesHeld / 40));
+    unclaimed = await collectUnclaimedByRingWalk(
+      db,
+      center,
+      minRing,
+      FRONTIER_MAX_RINGS,
+      overscan,
+      rng
+    );
+  } else {
+    const kingdomRadius = kingdomRadiusFromCentroid(center, ownedTileIds);
+    const extra = tilesExplored - EXPLORE_MONTE_CARLO_THRESHOLD;
+    const maxRadius = kingdomRadius + extra + 1;
+    unclaimed = await collectUnclaimedByMonteCarlo(
+      db,
+      center,
+      maxRadius,
+      overscan,
+      // Sample budget: enough to fill the batch with comfortable misses.
+      Math.max(MONTE_CARLO_MAX_SAMPLES, overscan * 4),
+      rng
+    );
+    if (unclaimed.length < count) {
+      // Fill any remaining slots from a deterministic ring walk over the
+      // same radius range so a sparse-RNG run still returns a usable batch.
+      const fallback = await collectUnclaimedByRingWalk(
+        db,
+        center,
+        1,
+        maxRadius,
+        overscan - unclaimed.length,
+        rng
+      );
+      const seen = new Set(
+        unclaimed.map((c) => tileIdFromAxial(c.q, c.r))
+      );
+      for (const c of fallback) {
+        const id = tileIdFromAxial(c.q, c.r);
+        if (!seen.has(id)) {
+          unclaimed.push(c);
+          seen.add(id);
+        }
+      }
+    }
+  }
+
+  if (unclaimed.length === 0) return [];
+  const picked = unclaimed.slice(0, count);
+  const pickedTileIdSet = new Set(
+    picked.map((c) => tileIdFromAxial(c.q, c.r))
+  );
+
+  // Collect the union of all neighbor tileIds (deduped, excluding picked
+  // candidates themselves so we don't waste a read on a coord we already
+  // know is unclaimed). One batched getAll.
+  const neighborIds = new Set<string>();
+  for (const c of picked) {
+    for (const n of axialNeighbors(c.q, c.r)) {
+      const id = tileIdFromAxial(n.q, n.r);
+      if (!pickedTileIdSet.has(id)) neighborIds.add(id);
+    }
+  }
+  const neighborOwnerById = new Map<string, string>();
+  if (neighborIds.size > 0) {
+    const neighborRefs = Array.from(neighborIds).map((id) =>
+      db.collection(COLLECTIONS.TILES).doc(id)
+    );
+    const neighborSnaps = await db.getAll(...neighborRefs);
+    for (const ns of neighborSnaps) {
+      if (!ns.exists) continue;
+      const data = ns.data();
+      if (data && typeof data.ownerId === "string") {
+        neighborOwnerById.set(ns.id, data.ownerId as string);
+      }
+    }
+  }
+
+  return picked.map((c) => {
+    const tileId = tileIdFromAxial(c.q, c.r);
+    let hostileCount = 0;
+    for (const n of axialNeighbors(c.q, c.r)) {
+      const owner = neighborOwnerById.get(tileIdFromAxial(n.q, n.r));
+      if (owner && owner !== userId) hostileCount++;
+    }
+    const distance = distanceToNearestOwned(c, [...ownedTileIds]);
+    const distanceFinite = Number.isFinite(distance) ? distance : 0;
+    return {
+      tile: c,
+      tileId,
+      distanceToCore: distanceFinite,
+      hostileNeighbors: hostileCount,
+      riskScore: riskScore({
+        hostileNeighbors: hostileCount,
+        distanceToCore: distanceFinite,
+      }),
+    };
+  });
+}
