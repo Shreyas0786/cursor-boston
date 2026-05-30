@@ -11,25 +11,16 @@
  * Requires: FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS
  * For --send: MAILGUN_API_KEY, MAILGUN_DOMAIN
  */
-import { loadEnvConfig } from "@next/env";
-loadEnvConfig(process.cwd());
+import { loadEnv, escapeHtml, parseSendArgs } from "./_lib/script-utils";
+loadEnv();
 
-import { getAdminDb } from "../lib/firebase-admin";
-import { sendEmail } from "../lib/mailgun";
+import { runEmailCampaign, type EmailContent } from "./_lib/campaign-runner";
 import { syncMailgunSuppressions } from "../lib/mailgun-suppressions";
 import { buildUnsubscribeUrl } from "../lib/unsubscribe-token";
 
 // ---------------------------------------------------------------------------
 // Email template
 // ---------------------------------------------------------------------------
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 interface ContactData {
   email: string;
@@ -42,11 +33,7 @@ interface ContactData {
   }[];
 }
 
-function buildEmail(contact: ContactData): {
-  subject: string;
-  html: string;
-  text: string;
-} {
+function buildEmail(contact: ContactData): EmailContent {
   const first = escapeHtml(
     contact.firstName?.trim() || contact.name?.split(" ")[0]?.trim() || "there"
   );
@@ -134,120 +121,61 @@ Unsubscribe: ${unsubUrl}`;
 // Main
 // ---------------------------------------------------------------------------
 
-async function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 async function main() {
-  const args = process.argv.slice(2);
-  const dryRun = args.includes("--dry-run");
-  const send = args.includes("--send");
+  await runEmailCampaign<ContactData>({
+    args: parseSendArgs(),
+    name: "Event-contacts announcement",
+    progressEvery: 50,
+    getEmail: (c) => c.email,
+    buildEmail,
+    // Mirror Mailgun bounces + complaints onto eventContacts.unsubscribed
+    // before reading the list. No-op if MAILGUN_PRIVATE_API_KEY is unset.
+    beforeSend: ({ db }) => syncMailgunSuppressions(db),
+    loadRecipients: async ({ db }) => {
+      console.log("Loading contacts from eventContacts…");
+      const snap = await db.collection("eventContacts").get();
+      console.log(`Total contacts: ${snap.size}`);
 
-  if ((dryRun && send) || (!dryRun && !send)) {
-    console.error("Specify exactly one of: --dry-run | --send");
-    process.exit(1);
-  }
+      const contacts: ContactData[] = [];
+      let skippedUnsubscribed = 0;
+      let skippedDeclinedOnly = 0;
 
-  if (send) {
-    if (!process.env.MAILGUN_API_KEY || !process.env.MAILGUN_DOMAIN) {
-      console.error("For --send, set MAILGUN_API_KEY and MAILGUN_DOMAIN.");
-      process.exit(1);
-    }
-  }
+      for (const doc of snap.docs) {
+        const data = doc.data();
 
-  const db = getAdminDb();
-  if (!db) {
-    console.error(
-      "Firebase Admin not configured (FIREBASE_SERVICE_ACCOUNT_JSON / GOOGLE_APPLICATION_CREDENTIALS)."
-    );
-    process.exit(1);
-  }
+        // Skip unsubscribed contacts
+        if (data.unsubscribed === true) {
+          skippedUnsubscribed++;
+          continue;
+        }
 
-  // Mirror Mailgun bounces + complaints onto eventContacts.unsubscribed
-  // before reading the list. No-op if MAILGUN_PRIVATE_API_KEY is unset.
-  await syncMailgunSuppressions(db);
+        const events: ContactData["events"] = (data.events || []).map(
+          (e: { eventName?: string; checkedIn?: boolean; approvalStatus?: string }) => ({
+            eventName: e.eventName || "",
+            checkedIn: e.checkedIn || false,
+            approvalStatus: e.approvalStatus || "",
+          })
+        );
 
-  console.log("Loading contacts from eventContacts…");
-  const snap = await db.collection("eventContacts").get();
-  console.log(`Total contacts: ${snap.size}`);
+        // Count declined-only for reporting but still include them
+        if (events.length > 0 && events.every((e) => e.approvalStatus === "declined")) {
+          skippedDeclinedOnly++;
+        }
 
-  const contacts: ContactData[] = [];
-  let skippedUnsubscribed = 0;
-  let skippedDeclinedOnly = 0;
-
-  for (const doc of snap.docs) {
-    const data = doc.data();
-
-    // Skip unsubscribed contacts
-    if (data.unsubscribed === true) {
-      skippedUnsubscribed++;
-      continue;
-    }
-
-    const events: ContactData["events"] = (data.events || []).map(
-      (e: { eventName?: string; checkedIn?: boolean; approvalStatus?: string }) => ({
-        eventName: e.eventName || "",
-        checkedIn: e.checkedIn || false,
-        approvalStatus: e.approvalStatus || "",
-      })
-    );
-
-    // Count declined-only for reporting but still include them
-    if (events.length > 0 && events.every((e) => e.approvalStatus === "declined")) {
-      skippedDeclinedOnly++;
-    }
-
-    contacts.push({
-      email: data.email || doc.id,
-      name: data.name || "",
-      firstName: data.firstName || "",
-      events,
-    });
-  }
-
-  console.log(
-    `Eligible: ${contacts.length} | Skipped unsubscribed: ${skippedUnsubscribed} | Declined-only (still included): ${skippedDeclinedOnly}`
-  );
-
-  if (dryRun) {
-    console.log("\n--dry-run: no emails sent.\n");
-
-    // Show sample
-    const sample = contacts[0];
-    if (sample) {
-      const { subject, html } = buildEmail(sample);
-      console.log(`Sample email to: ${sample.email}`);
-      console.log(`Subject: ${subject}`);
-      console.log(`Events: ${sample.events.map((e) => e.eventName).join(", ")}`);
-      console.log(`\nHTML preview:\n---\n${html.slice(0, 600)}…\n---`);
-    }
-
-    console.log(`\nWould send to ${contacts.length} contacts.`);
-    return;
-  }
-
-  // Send emails
-  let sent = 0;
-  let failed = 0;
-
-  for (const contact of contacts) {
-    const { subject, html, text } = buildEmail(contact);
-    try {
-      await sendEmail({ to: contact.email, subject, html, text });
-      sent++;
-      if (sent % 50 === 0) {
-        console.log(`  Progress: ${sent}/${contacts.length}`);
+        contacts.push({
+          email: data.email || doc.id,
+          name: data.name || "",
+          firstName: data.firstName || "",
+          events,
+        });
       }
-    } catch (e) {
-      failed++;
-      console.error(`Failed: ${contact.email}`, e);
-    }
-    await sleep(450);
-  }
 
-  console.log(
-    `\nDone. Sent ${sent}, failed ${failed}, skipped ${skippedUnsubscribed + skippedDeclinedOnly}.`
-  );
+      console.log(
+        `Eligible: ${contacts.length} | Skipped unsubscribed: ${skippedUnsubscribed} | Declined-only (still included): ${skippedDeclinedOnly}`
+      );
+      return contacts;
+    },
+  });
 }
 
 main().catch((e) => {
