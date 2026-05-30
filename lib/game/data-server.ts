@@ -22,6 +22,17 @@ import {
   resolveAttack,
   rollSpellEffectiveness,
 } from "./combat";
+import {
+  GAME_COLLECTIONS as COLLECTIONS,
+  WORLD_META_DOC,
+} from "./data-access/collections";
+import {
+  addStacks as addStack,
+  isValidUnitStack,
+  stackHasAtLeast,
+  subtractStack,
+  sumStack,
+} from "./unit-stack";
 import { ARTIFACTS_BY_ID, SPELLS_BY_ID } from "./content";
 import {
   ARMAGEDDON_TILE_GATE,
@@ -721,30 +732,6 @@ export class GameLastStandNoThreatError extends Error {
     this.name = "GameLastStandNoThreatError";
   }
 }
-
-const COLLECTIONS = {
-  PLAYERS: "game_players",
-  TILES: "game_tiles",
-  ATTACKS: "game_attacks",
-  WORLD_META: "game_world_meta",
-  ARTIFACTS: "game_artifacts",
-  // Community feed: append-only event log of player actions (joins,
-  // caste picks, attacks, milestones). Read by the dashboard's
-  // CommunityPanel. Writes are Admin-SDK only.
-  COMMUNITY_EVENTS: "game_community_events",
-  // Community chat: free-form messages from authenticated players,
-  // moderated by author or by an admin (delete-only).
-  COMMUNITY_MESSAGES: "game_community_messages",
-  // End-game / Armageddon hall-of-fame: one doc per past Armageddon
-  // (doc id = seasonNumber). Persisted before the wipe so the record
-  // survives even if the resolver crashes mid-batch.
-  ARMAGEDDON_EVENTS: "game_armageddon_events",
-  // Zero-turn gameplay: queued battle plans that execute at next weekly
-  // grant. Owned by player; writes Admin-SDK only.
-  ORDER_QUEUE: "game_order_queue",
-} as const;
-
-const WORLD_META_DOC = "singleton";
 
 // Land types you can distribute a tile to. "unassigned" is allowed so the
 // player can revert a tile back (and pay 1 turn for the privilege); they
@@ -1967,49 +1954,9 @@ export async function chooseCasteServer(
   });
 }
 
-function sumStack(s: UnitStack): number {
-  return s.ground + s.siege + s.air;
-}
-
-function addStack(a: UnitStack, b: UnitStack): UnitStack {
-  return {
-    ground: a.ground + b.ground,
-    siege: a.siege + b.siege,
-    air: a.air + b.air,
-  };
-}
-
-function subtractStack(a: UnitStack, b: UnitStack): UnitStack {
-  return {
-    ground: Math.max(0, a.ground - b.ground),
-    siege: Math.max(0, a.siege - b.siege),
-    air: Math.max(0, a.air - b.air),
-  };
-}
-
-function stackHasAtLeast(have: UnitStack, need: UnitStack): boolean {
-  return (
-    have.ground >= need.ground &&
-    have.siege >= need.siege &&
-    have.air >= need.air
-  );
-}
-
-function isValidUnitStack(s: unknown): s is UnitStack {
-  if (!s || typeof s !== "object") return false;
-  const obj = s as Record<string, unknown>;
-  return (
-    typeof obj.ground === "number" &&
-    typeof obj.siege === "number" &&
-    typeof obj.air === "number" &&
-    obj.ground >= 0 &&
-    obj.siege >= 0 &&
-    obj.air >= 0 &&
-    Number.isInteger(obj.ground) &&
-    Number.isInteger(obj.siege) &&
-    Number.isInteger(obj.air)
-  );
-}
+// Unit-stack arithmetic (sumStack/addStack/subtractStack/stackHasAtLeast/
+// isValidUnitStack) lives in ./unit-stack — see the import above. `addStack`
+// is the local alias for the canonical `addStacks`.
 
 // Counts the player's tiles by land type. Done OUTSIDE the build/attack
 // transactions because Firestore txns can't query — the count is at most one
