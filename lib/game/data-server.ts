@@ -22,6 +22,13 @@ import {
   resolveAttack,
   rollSpellEffectiveness,
 } from "./combat";
+import {
+  addStacks as addStack,
+  isValidUnitStack,
+  stackHasAtLeast,
+  subtractStack,
+  sumStack,
+} from "./unit-stack";
 import { ARTIFACTS_BY_ID, SPELLS_BY_ID } from "./content";
 import {
   ARMAGEDDON_TILE_GATE,
@@ -1967,49 +1974,9 @@ export async function chooseCasteServer(
   });
 }
 
-function sumStack(s: UnitStack): number {
-  return s.ground + s.siege + s.air;
-}
-
-function addStack(a: UnitStack, b: UnitStack): UnitStack {
-  return {
-    ground: a.ground + b.ground,
-    siege: a.siege + b.siege,
-    air: a.air + b.air,
-  };
-}
-
-function subtractStack(a: UnitStack, b: UnitStack): UnitStack {
-  return {
-    ground: Math.max(0, a.ground - b.ground),
-    siege: Math.max(0, a.siege - b.siege),
-    air: Math.max(0, a.air - b.air),
-  };
-}
-
-function stackHasAtLeast(have: UnitStack, need: UnitStack): boolean {
-  return (
-    have.ground >= need.ground &&
-    have.siege >= need.siege &&
-    have.air >= need.air
-  );
-}
-
-function isValidUnitStack(s: unknown): s is UnitStack {
-  if (!s || typeof s !== "object") return false;
-  const obj = s as Record<string, unknown>;
-  return (
-    typeof obj.ground === "number" &&
-    typeof obj.siege === "number" &&
-    typeof obj.air === "number" &&
-    obj.ground >= 0 &&
-    obj.siege >= 0 &&
-    obj.air >= 0 &&
-    Number.isInteger(obj.ground) &&
-    Number.isInteger(obj.siege) &&
-    Number.isInteger(obj.air)
-  );
-}
+// Unit-stack arithmetic (sumStack/addStack/subtractStack/stackHasAtLeast/
+// isValidUnitStack) lives in ./unit-stack — see the import above. `addStack`
+// is the local alias for the canonical `addStacks`.
 
 // Counts the player's tiles by land type. Done OUTSIDE the build/attack
 // transactions because Firestore txns can't query — the count is at most one
