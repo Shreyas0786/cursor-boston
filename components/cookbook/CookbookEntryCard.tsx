@@ -129,7 +129,7 @@ export function CookbookEntryCard({
                   </span>
                 ))}
                 {worksWithMore > 0 && (
-                  <span className="px-2.5 py-1 bg-neutral-200 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 text-xs font-medium rounded-full">
+                  <span className={CLASS_GROUPS.tag.neutralStrongPill}>
                     +{worksWithMore}
                   </span>
                 )}
@@ -166,7 +166,7 @@ export function CookbookEntryCard({
                   )
                 )}
                 {tagsMore > 0 && (
-                  <span className="px-2.5 py-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 text-xs font-medium rounded-full">
+                  <span className={CLASS_GROUPS.tag.neutralPill}>
                     +{tagsMore}
                   </span>
                 )}
