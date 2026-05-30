@@ -12,6 +12,7 @@
 
 import { sendDiscordNotification } from "@/lib/discord";
 import { logger } from "@/lib/logger";
+import { sumStack } from "./unit-stack";
 import type { Caste, GameAttack } from "./types";
 
 const CASTE_COLOR: Record<Caste, number> = {
@@ -24,10 +25,6 @@ const CASTE_COLOR: Record<Caste, number> = {
 
 function gameWebhookUrl(): string | null {
   return process.env.GAME_DISCORD_WEBHOOK_URL?.trim() || null;
-}
-
-function sumStack(s: { ground: number; siege: number; air: number }): number {
-  return s.ground + s.siege + s.air;
 }
 
 /** @internal */

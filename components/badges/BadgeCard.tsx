@@ -6,6 +6,7 @@
  */
 
 import { useRef, useState, type KeyboardEvent, type SVGProps } from "react";
+import { formatMonthYear } from "@/lib/format-helpers";
 import type { BadgeDefinition, BadgeEligibilityResult } from "@/lib/badges/types";
 import { CLASS_GROUPS, TAILWIND_CLASS_NAMES as TW } from "@/lib/classname-constants";
 import { cn } from "@/lib/utils";
@@ -168,10 +169,7 @@ export function BadgeCard({
   const earnedDate = awardedAt ? new Date(awardedAt) : null;
   const earnedDateLabel =
     isEarned && earnedDate && !Number.isNaN(earnedDate.getTime())
-      ? earnedDate.toLocaleDateString("en-US", {
-          month: "short",
-          year: "numeric",
-        })
+      ? formatMonthYear(earnedDate)
       : null;
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {

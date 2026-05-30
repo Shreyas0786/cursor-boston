@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { ZodError } from "zod";
 
 /**
  * Standard error codes for API responses.
@@ -70,6 +71,23 @@ export async function parseRequestBody<T = Record<string, any>>(
       { status: 400 }
     );
   }
+}
+
+/**
+ * Extract the first Zod validation message, falling back to a generic string.
+ *
+ * Replaces the `parsed.error.issues[0]?.message ?? "…"` idiom that appears in
+ * ~100 route handlers. Use after a failed `safeParse()`:
+ *
+ *   if (!parsed.success) {
+ *     return apiError(getFirstValidationError(parsed.error), 400);
+ *   }
+ */
+export function getFirstValidationError(
+  error: ZodError,
+  fallback: string = "Invalid request"
+): string {
+  return error.issues[0]?.message ?? fallback;
 }
 
 function inferErrorCode(status: number): ErrorCodeType {

@@ -16,6 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getFirstValidationError } from "@/lib/api-response";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getVerifiedUser } from "@/lib/server-auth";
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     const parsed = communityContract.block.body.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Invalid body" },
+        { error: getFirstValidationError(parsed.error, "Invalid body") },
         { status: 400 }
       );
     }
@@ -86,7 +87,7 @@ export async function DELETE(request: NextRequest) {
     });
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Missing targetUid" },
+        { error: getFirstValidationError(parsed.error, "Missing targetUid") },
         { status: 400 }
       );
     }

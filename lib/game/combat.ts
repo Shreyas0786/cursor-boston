@@ -34,6 +34,10 @@ import type {
   UnitStack,
   UnitType,
 } from "./types";
+import { addStacks, emptyStack, sumStack } from "./unit-stack";
+
+// Re-exported for backward compatibility with prior `./combat` import sites.
+export { addStacks };
 
 const UNIT_TYPES: readonly UnitType[] = ["ground", "siege", "air"] as const;
 
@@ -660,14 +664,6 @@ export function attributeAttackerLosses(args: {
 // empty — handy because pieces of code outside combat.ts will start needing
 // to sum SUPER+BASE.
 /** @internal */
-export function addStacks(a: UnitStack, b: UnitStack): UnitStack {
-  return {
-    ground: a.ground + b.ground,
-    siege: a.siege + b.siege,
-    air: a.air + b.air,
-  };
-}
-
 export function computeTileCapacity(
   landType: LandType,
   caste: Caste | null,
@@ -709,14 +705,6 @@ export function makeSeededRng(seed: string): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-function sumStack(s: UnitStack): number {
-  return s.ground + s.siege + s.air;
-}
-
-function emptyStack(): UnitStack {
-  return { ground: 0, siege: 0, air: 0 };
 }
 
 function clampStackToCapacity(

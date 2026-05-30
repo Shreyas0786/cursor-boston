@@ -8,6 +8,7 @@
 "use client";
 
 import Image from "next/image";
+import { formatShortDate } from "@/lib/format-helpers";
 import Link from "next/link";
 import { useId, useMemo } from "react";
 import type { Event } from "@/types/events";
@@ -36,11 +37,7 @@ function PastStyleEventCard({ event }: { event: Event }) {
       <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-1">
         {event.date === "TBD"
           ? "Date TBD"
-          : new Date(event.date).toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
+          : formatShortDate(event.date)}
       </p>
       <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-3">
         {event.location}

@@ -14,12 +14,11 @@
  * Requires: FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS
  * For --send: MAILGUN_API_KEY, MAILGUN_DOMAIN
  */
-import { loadEnvConfig } from "@next/env";
-loadEnvConfig(process.cwd());
+import { loadEnv, escapeHtml, parseSendArgs } from "./_lib/script-utils";
+loadEnv();
 
 import { FieldValue } from "firebase-admin/firestore";
-import { getAdminDb } from "../lib/firebase-admin";
-import { sendEmail } from "../lib/mailgun";
+import { runEmailCampaign, type EmailContent } from "./_lib/campaign-runner";
 import { buildUnsubscribeUrl } from "../lib/unsubscribe-token";
 import {
   SUMMER_COHORT_COLLECTION,
@@ -27,14 +26,6 @@ import {
   isValidCohortId,
   type SummerCohortId,
 } from "../lib/summer-cohort";
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 interface Admit {
   uid: string;
@@ -46,11 +37,7 @@ interface Admit {
 
 const PAGE_URL = "https://cursorboston.com/summer-cohort";
 
-function buildEmail(admit: Admit): {
-  subject: string;
-  html: string;
-  text: string;
-} {
+function buildEmail(admit: Admit): EmailContent {
   const first = escapeHtml(admit.name?.split(" ")[0]?.trim() || "there");
   const unsubUrl = buildUnsubscribeUrl(admit.email);
   const cohortLabels = admit.cohorts
@@ -164,106 +151,63 @@ Unsubscribe: ${unsubUrl}`;
   return { subject, html, text };
 }
 
-async function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 async function main() {
-  const args = process.argv.slice(2);
-  const dryRun = args.includes("--dry-run");
-  const send = args.includes("--send");
-  if (dryRun === send) {
-    console.error("Specify exactly one of: --dry-run | --send");
-    process.exit(1);
-  }
-  if (send && (!process.env.MAILGUN_API_KEY || !process.env.MAILGUN_DOMAIN)) {
-    console.error("For --send, set MAILGUN_API_KEY and MAILGUN_DOMAIN.");
-    process.exit(1);
-  }
+  const args = parseSendArgs();
 
-  const db = getAdminDb();
-  if (!db) {
-    console.error("Firebase Admin not configured");
-    process.exit(1);
-  }
+  await runEmailCampaign<Admit>({
+    args,
+    name: "Summer cohort admittance",
+    getEmail: (a) => a.email,
+    buildEmail,
+    loadRecipients: async ({ db }) => {
+      const snap = await db
+        .collection(SUMMER_COHORT_COLLECTION)
+        .where("status", "==", "admitted")
+        .get();
+      console.log(`Admitted applicants: ${snap.size}`);
 
-  const snap = await db
-    .collection(SUMMER_COHORT_COLLECTION)
-    .where("status", "==", "admitted")
-    .get();
+      const queue: Admit[] = [];
+      let alreadyEmailed = 0;
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        if (!args.force && data.admittanceEmailedAt) {
+          alreadyEmailed++;
+          continue;
+        }
+        const email = (data.email || "").toString().trim();
+        if (!email || !email.includes("@")) continue;
+        if (args.onlyEmail && email.toLowerCase() !== args.onlyEmail) continue;
+        const cohorts = (Array.isArray(data.cohorts) ? data.cohorts : []).filter(
+          isValidCohortId
+        ) as SummerCohortId[];
+        if (cohorts.length === 0) continue;
 
-  console.log(`Admitted applicants: ${snap.size}`);
+        let hasDiscord = false;
+        const uid = (data.userId || doc.id).toString();
+        if (uid) {
+          const userSnap = await db.collection("users").doc(uid).get();
+          hasDiscord = Boolean(userSnap.data()?.discord?.id);
+        }
 
-  const queue: Admit[] = [];
-  let alreadyEmailed = 0;
-  for (const doc of snap.docs) {
-    const data = doc.data();
-    if (data.admittanceEmailedAt) {
-      alreadyEmailed++;
-      continue;
-    }
-    const email = (data.email || "").toString().trim();
-    if (!email || !email.includes("@")) continue;
-    const cohorts = (Array.isArray(data.cohorts) ? data.cohorts : []).filter(
-      isValidCohortId
-    ) as SummerCohortId[];
-    if (cohorts.length === 0) continue;
-
-    let hasDiscord = false;
-    const uid = (data.userId || doc.id).toString();
-    if (uid) {
-      const userSnap = await db.collection("users").doc(uid).get();
-      hasDiscord = Boolean(userSnap.data()?.discord?.id);
-    }
-
-    queue.push({
-      uid,
-      name: typeof data.name === "string" ? data.name : "",
-      email,
-      cohorts,
-      hasDiscord,
-    });
-  }
-
-  console.log(`To email now: ${queue.length} | Already emailed: ${alreadyEmailed}`);
-
-  if (dryRun) {
-    const sample = queue[0];
-    if (sample) {
-      const { subject, html } = buildEmail(sample);
-      console.log(`\nSample to: ${sample.email} (${sample.name || "(no name)"})`);
-      console.log(`Discord connected: ${sample.hasDiscord}`);
-      console.log(`Subject: ${subject}`);
-      console.log(`\n---- HTML preview (first 1800 chars) ----\n${html.slice(0, 1800)}\n…`);
-    } else {
-      console.log("\n(no admits to email — either none in 'admitted' status, or all already emailed)");
-    }
-    console.log(`\n--dry-run: no emails sent and no writes.`);
-    return;
-  }
-
-  let sent = 0;
-  let failed = 0;
-  for (const admit of queue) {
-    const { subject, html, text } = buildEmail(admit);
-    try {
-      await sendEmail({ to: admit.email, subject, html, text });
-      await db.collection(SUMMER_COHORT_COLLECTION).doc(admit.uid).set(
-        { admittanceEmailedAt: FieldValue.serverTimestamp() },
-        { merge: true }
-      );
-      sent++;
-      if (sent % 10 === 0) {
-        console.log(`  Progress: ${sent}/${queue.length}`);
+        queue.push({
+          uid,
+          name: typeof data.name === "string" ? data.name : "",
+          email,
+          cohorts,
+          hasDiscord,
+        });
       }
-    } catch (e) {
-      failed++;
-      console.error(`Failed: ${admit.email}`, e);
-    }
-    await sleep(450);
-  }
 
-  console.log(`\nDone. Sent ${sent}, failed ${failed}, already-emailed ${alreadyEmailed}.`);
+      console.log(`To email now: ${queue.length} | Already emailed: ${alreadyEmailed}`);
+      return queue;
+    },
+    onSent: (a, { db }) =>
+      db
+        .collection(SUMMER_COHORT_COLLECTION)
+        .doc(a.uid)
+        .set({ admittanceEmailedAt: FieldValue.serverTimestamp() }, { merge: true }),
+    progressEvery: 10,
+  });
 }
 
 main().catch((e) => {

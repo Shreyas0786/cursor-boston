@@ -20,7 +20,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import type {
   QueuedOrder,
   QueuedOrderKind,
@@ -62,11 +62,6 @@ export class QueuedOrderInvalidParamsError extends Error {
   }
 }
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 // Param validation -------------------------------------------------------
 

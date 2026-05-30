@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getFirstValidationError } from "@/lib/api-response";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getVerifiedUser } from "@/lib/server-auth";
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     const parsed = communityContract.createReply.body.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Invalid body" },
+        { error: getFirstValidationError(parsed.error, "Invalid body") },
         { status: 400 }
       );
     }
