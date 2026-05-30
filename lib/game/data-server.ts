@@ -23,6 +23,10 @@ import {
   rollSpellEffectiveness,
 } from "./combat";
 import {
+  GAME_COLLECTIONS as COLLECTIONS,
+  WORLD_META_DOC,
+} from "./data-access/collections";
+import {
   addStacks as addStack,
   isValidUnitStack,
   stackHasAtLeast,
@@ -728,30 +732,6 @@ export class GameLastStandNoThreatError extends Error {
     this.name = "GameLastStandNoThreatError";
   }
 }
-
-const COLLECTIONS = {
-  PLAYERS: "game_players",
-  TILES: "game_tiles",
-  ATTACKS: "game_attacks",
-  WORLD_META: "game_world_meta",
-  ARTIFACTS: "game_artifacts",
-  // Community feed: append-only event log of player actions (joins,
-  // caste picks, attacks, milestones). Read by the dashboard's
-  // CommunityPanel. Writes are Admin-SDK only.
-  COMMUNITY_EVENTS: "game_community_events",
-  // Community chat: free-form messages from authenticated players,
-  // moderated by author or by an admin (delete-only).
-  COMMUNITY_MESSAGES: "game_community_messages",
-  // End-game / Armageddon hall-of-fame: one doc per past Armageddon
-  // (doc id = seasonNumber). Persisted before the wipe so the record
-  // survives even if the resolver crashes mid-batch.
-  ARMAGEDDON_EVENTS: "game_armageddon_events",
-  // Zero-turn gameplay: queued battle plans that execute at next weekly
-  // grant. Owned by player; writes Admin-SDK only.
-  ORDER_QUEUE: "game_order_queue",
-} as const;
-
-const WORLD_META_DOC = "singleton";
 
 // Land types you can distribute a tile to. "unassigned" is allowed so the
 // player can revert a tile back (and pay 1 turn for the privilege); they

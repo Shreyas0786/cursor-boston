@@ -41,6 +41,10 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { logger } from "@/lib/logger";
 import { makeSeededRng } from "./combat";
 import {
+  GAME_COLLECTIONS as COLLECTIONS,
+  WORLD_META_DOC,
+} from "./data-access/collections";
+import {
   SEAL_COUNT,
   TOP_BY_TILES_SNAPSHOT_COUNT,
   WINNER_COUNT,
@@ -60,18 +64,6 @@ import type {
   GameWorldMeta,
   SealRecord,
 } from "./types";
-
-const COLLECTIONS = {
-  PLAYERS: "game_players",
-  TILES: "game_tiles",
-  ATTACKS: "game_attacks",
-  WORLD_META: "game_world_meta",
-  ARTIFACTS: "game_artifacts",
-  INTEL_EFFECTS: "game_intel_effects",
-  COMMUNITY_EVENTS: "game_community_events",
-  ARMAGEDDON_EVENTS: "game_armageddon_events",
-} as const;
-const WORLD_META_DOC = "singleton";
 
 /** Firestore batched-write limit is 500; leave headroom. */
 const BATCH_SIZE = 400;
