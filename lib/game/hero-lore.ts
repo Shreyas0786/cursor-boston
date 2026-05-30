@@ -23,7 +23,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Timestamp } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import { sanitizeText } from "@/lib/sanitize";
 import type { Caste, GameHeroDoc } from "./types";
 
@@ -97,11 +97,6 @@ export class HeroNotFoundError extends Error {
   }
 }
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 async function loadHero(db: Firestore, heroId: string): Promise<GameHeroDoc> {
   const snap = await db.collection(HEROES).doc(heroId).get();

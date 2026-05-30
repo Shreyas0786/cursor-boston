@@ -20,7 +20,7 @@
  */
 
 import { FieldValue, Firestore } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import type {
   ReactionEmoji,
   ReactionMap,
@@ -31,11 +31,6 @@ import { REACTION_EMOJIS } from "./types";
 
 const TRACKERS_COLLECTION = "game_reactions";
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 export class ReactionInvalidScopeError extends Error {
   constructor() {

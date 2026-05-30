@@ -37,7 +37,7 @@ import type {
   Firestore,
   Query,
 } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import { logger } from "@/lib/logger";
 import { makeSeededRng } from "./combat";
 import {
@@ -68,11 +68,6 @@ import type {
 /** Firestore batched-write limit is 500; leave headroom. */
 const BATCH_SIZE = 400;
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 interface Participant {
   userId: string;
