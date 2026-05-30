@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getFirstValidationError } from "@/lib/api-response";
 import type { DocumentData, Firestore, QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getOptionalVerifiedUser } from "@/lib/server-auth";
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest) {
     });
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Invalid query" },
+        { error: getFirstValidationError(parsed.error, "Invalid query") },
         { status: 400 }
       );
     }

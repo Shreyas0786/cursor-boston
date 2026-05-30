@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getFirstValidationError } from "@/lib/api-response";
 import { getQuestionsService } from "@/lib/questions/service";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
     });
     if (!queryParsed.success) {
       return NextResponse.json(
-        { error: queryParsed.error.issues[0]?.message ?? "Invalid query" },
+        { error: getFirstValidationError(queryParsed.error, "Invalid query") },
         { status: 400 }
       );
     }
