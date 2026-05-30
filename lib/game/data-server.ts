@@ -9,7 +9,6 @@ import { randomUUID } from "node:crypto";
 import type { Firestore, Timestamp, Transaction } from "firebase-admin/firestore";
 import { adminDbOrThrow } from "./data-access/db";
 import {
-  applyBaseRegen,
   applyFlyoverModifiers,
   attributeAttackerLosses,
   attributeDefenderLosses,
@@ -29,6 +28,10 @@ import {
 import { defaultedWorldMeta, getWorldMetaServer } from "./data-access/world-meta";
 // Re-exported so existing `@/lib/game/data-server` importers keep working.
 export { getWorldMetaServer };
+import {
+  applyLazyRegen,
+  applyLazyRegenBatch,
+} from "./data-access/tile-regen";
 import {
   addStacks as addStack,
   isValidUnitStack,
@@ -850,88 +853,6 @@ export async function getOwnedTilesServer(userId: string): Promise<GameTile[]> {
   const player = playerSnap.exists ? (playerSnap.data() as GamePlayer) : null;
   const tiles = snap.docs.map((d) => d.data() as GameTile);
   return applyLazyRegenBatch(tiles, player, new Date());
-}
-
-// In-memory + fire-and-forget Firestore writeback of BASE regen across a
-// batch of tiles. Returns the regenerated tiles. Writes only fire for tiles
-// where the BASE delta is non-zero (avoids write storms on read-heavy paths).
-// The writes are not awaited — the caller's response uses the in-memory
-// regen result; the next request reads the persisted values.
-function applyLazyRegenBatch(
-  tiles: GameTile[],
-  player: GamePlayer | null,
-  now: Date
-): GameTile[] {
-  const db = adminDbOrThrow();
-  const out: GameTile[] = [];
-  for (const t of tiles) {
-    out.push(applyLazyRegen(t, player, now, db));
-  }
-  return out;
-}
-
-function applyLazyRegen(
-  tile: GameTile,
-  player: GamePlayer | null,
-  now: Date,
-  db: Firestore
-): GameTile {
-  if (!tile.ownerId) return tile;
-  const currentBase = tile.baseUnits ?? { ground: 0, siege: 0, air: 0 };
-  const target = baseUnitsTarget({
-    landType: tile.type,
-    caste: player?.caste ?? null,
-    upgradeIds: tile.upgradeIds,
-    intrinsicBuffs: tile.intrinsicBuffs,
-    createdAt:
-      tile.createdAt instanceof Date
-        ? tile.createdAt
-        : typeof (tile.createdAt as Timestamp | undefined)?.toDate === "function"
-          ? (tile.createdAt as Timestamp).toDate()
-          : undefined,
-    activeUpgrades: player?.activeUpgrades ?? {},
-    productionSpellsActive: player?.productionSpellsActive,
-    now,
-  });
-  const baseRegenedAt =
-    tile.baseRegenedAt instanceof Date
-      ? tile.baseRegenedAt
-      : typeof (tile.baseRegenedAt as Timestamp | undefined)?.toDate ===
-          "function"
-        ? (tile.baseRegenedAt as Timestamp).toDate()
-        : tile.createdAt instanceof Date
-          ? tile.createdAt
-          : typeof (tile.createdAt as Timestamp | undefined)?.toDate ===
-              "function"
-            ? (tile.createdAt as Timestamp).toDate()
-            : now;
-  const result = applyBaseRegen({
-    currentBase,
-    target,
-    landType: tile.type,
-    baseRegenedAt,
-    now,
-  });
-  if (result.deltaUnits <= 0) return tile;
-  // Fire-and-forget Firestore writeback. Failures are logged inside the
-  // surrounding logger; we don't await so the read path stays snappy.
-  db.collection(COLLECTIONS.TILES)
-    .doc(tile.tileId)
-    .update({
-      baseUnits: result.baseUnits,
-      baseRegenedAt: result.baseRegenedAt,
-    })
-    .catch((e) => {
-      logger.warn("applyLazyRegen writeback failed", {
-        tileId: tile.tileId,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    });
-  return {
-    ...tile,
-    baseUnits: result.baseUnits,
-    baseRegenedAt: result.baseRegenedAt,
-  };
 }
 
 // Lightweight tile fetch — uses Firestore's select() to only pull the fields
