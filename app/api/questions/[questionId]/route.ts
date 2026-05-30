@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getFirstValidationError } from "@/lib/api-response";
 import { getQuestionsService } from "@/lib/questions/service";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
@@ -37,7 +38,7 @@ export async function GET(
     });
     if (!paramParsed.success) {
       return NextResponse.json(
-        { error: paramParsed.error.issues[0]?.message ?? "Invalid question ID" },
+        { error: getFirstValidationError(paramParsed.error, "Invalid question ID") },
         { status: 400 }
       );
     }

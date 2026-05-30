@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getFirstValidationError } from "@/lib/api-response";
 import { getVerifiedUser } from "@/lib/server-auth";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     });
     if (!queryParsed.success) {
       return NextResponse.json(
-        { error: queryParsed.error.issues[0]?.message ?? "Invalid query" },
+        { error: getFirstValidationError(queryParsed.error, "Invalid query") },
         { status: 400 }
       );
     }
