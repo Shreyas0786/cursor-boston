@@ -23,7 +23,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import type {
   AttackOutcome,
   Caste,
@@ -34,11 +34,6 @@ import type {
   HeroSpecialty,
 } from "./types";
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 const COMMUNITY_EVENTS = "game_community_events";
 const COMMUNITY_MESSAGES = "game_community_messages";

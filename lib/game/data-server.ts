@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Timestamp, Transaction } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import {
   applyBaseRegen,
   applyFlyoverModifiers,
@@ -742,11 +742,6 @@ const VALID_DISTRIBUTABLE_TYPES = new Set<LandType>([
 ]);
 const VALID_CASTES = new Set<Caste>(["black", "red", "white", "green", "blue"]);
 
-function adminDbOrThrow() {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 // ── End-game / Armageddon helpers ─────────────────────────────────────
 // Coalesce a possibly-pre-Armageddon worldMeta doc to a full GameWorldMeta

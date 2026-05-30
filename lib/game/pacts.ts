@@ -15,7 +15,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import { sanitizeText } from "@/lib/sanitize";
 import type { Caste, Pact } from "./types";
 import { logCommunityEventInTx } from "./community";
@@ -61,11 +61,6 @@ export class PactNotFoundError extends Error {
   }
 }
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 interface PlayerDenorm {
   userId: string;
