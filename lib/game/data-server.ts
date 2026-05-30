@@ -26,6 +26,9 @@ import {
   GAME_COLLECTIONS as COLLECTIONS,
   WORLD_META_DOC,
 } from "./data-access/collections";
+import { defaultedWorldMeta, getWorldMetaServer } from "./data-access/world-meta";
+// Re-exported so existing `@/lib/game/data-server` importers keep working.
+export { getWorldMetaServer };
 import {
   addStacks as addStack,
   isValidUnitStack,
@@ -748,20 +751,6 @@ const VALID_CASTES = new Set<Caste>(["black", "red", "white", "green", "blue"]);
 // with safe defaults. Pre-Armageddon docs (and freshly-bootstrapped envs)
 // don't have sealsBroken / armageddonState / seasonNumber set; treat
 // season as 1 and state as "active" so legacy reads behave correctly.
-function defaultedWorldMeta(raw: Partial<GameWorldMeta> | undefined): GameWorldMeta {
-  return {
-    playerCount: raw?.playerCount ?? 0,
-    seasonNumber: raw?.seasonNumber ?? 1,
-    sealsBroken: raw?.sealsBroken ?? 0,
-    seals: raw?.seals ?? [],
-    armageddonState: raw?.armageddonState ?? "active",
-    armageddonStartedAt: raw?.armageddonStartedAt,
-    armageddonResolvedAt: raw?.armageddonResolvedAt,
-    lastSpawnAt: raw?.lastSpawnAt,
-    updatedAt: raw?.updatedAt,
-  };
-}
-
 /** Refuses turn-spending actions while the world is being remade. Also
  *  refuses stale player docs (left over from a prior season after a
  *  partial wipe — should be rare since the resolver deletes them, but
@@ -792,18 +781,6 @@ async function readWorldMetaInTx(
   const snap = await tx.get(ref);
   const raw = snap.exists ? (snap.data() as Partial<GameWorldMeta>) : undefined;
   return { meta: defaultedWorldMeta(raw), ref };
-}
-
-/** Read-only world-meta fetch for dashboard / hall-of-fame surfacing.
- *  Returns the defaulted shape even when the doc doesn't exist yet. */
-export async function getWorldMetaServer(): Promise<GameWorldMeta> {
-  const db = adminDbOrThrow();
-  const snap = await db
-    .collection(COLLECTIONS.WORLD_META)
-    .doc(WORLD_META_DOC)
-    .get();
-  const raw = snap.exists ? (snap.data() as Partial<GameWorldMeta>) : undefined;
-  return defaultedWorldMeta(raw);
 }
 
 // Rolls (3% chance) for an artifact and stages a tx.set() to persist it if
