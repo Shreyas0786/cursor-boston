@@ -5,6 +5,7 @@
  * See LICENSE file for details.
  */
 
+import { getGithubApiHeaders } from "@/lib/github-api-helpers";
 import { logger } from "@/lib/logger";
 
 const DEFAULT_OWNER = "rogerSuperBuilderAlpha";
@@ -72,7 +73,6 @@ export async function fetchRecentMergedPullRequests(
 ): Promise<{ prs: MergedPullRequestSummary[]; repoUrl: string; error?: boolean }> {
   const { owner, repo } = getGithubRepoPair();
   const repoUrl = `https://github.com/${owner}/${repo}`;
-  const token = process.env.GITHUB_TOKEN;
   const url = new URL(
     `https://api.github.com/repos/${owner}/${repo}/pulls`
   );
@@ -83,11 +83,7 @@ export async function fetchRecentMergedPullRequests(
 
   try {
     const res = await fetch(url.toString(), {
-      headers: {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: getGithubApiHeaders(),
       next: { revalidate: 300 },
     });
 

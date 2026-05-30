@@ -8,6 +8,11 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getGithubRepoPair } from "@/lib/github-recent-merged-prs";
+import {
+  getGithubApiHeaders as githubHeaders,
+  GITHUB_SEARCH_PER_PAGE as SEARCH_PER_PAGE,
+  GITHUB_SEARCH_MAX_PAGES as SEARCH_MAX_PAGES,
+} from "@/lib/github-api-helpers";
 import { logger } from "@/lib/logger";
 
 type SearchMergedPrItem = {
@@ -20,21 +25,7 @@ type SearchMergedPrItem = {
   user?: { login?: string } | null;
 };
 
-const SEARCH_PER_PAGE = 100;
-const SEARCH_MAX_PAGES = 10;
 const BATCH_WRITE_LIMIT = 400;
-
-function githubHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-  };
-  const token = process.env.GITHUB_TOKEN;
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-  return headers;
-}
 
 /** @internal */
 export async function fetchMergedPullRequestsForAuthor(
