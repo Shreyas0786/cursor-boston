@@ -6,6 +6,7 @@
  */
 
 import { getGithubRepoPair } from "@/lib/github-recent-merged-prs";
+import { getGithubApiHeaders as githubHeaders } from "@/lib/github-api-helpers";
 import { logger } from "@/lib/logger";
 
 export type OpenPrWithReviewSummary = {
@@ -29,16 +30,6 @@ type ReviewItem = {
   state?: unknown;
   submitted_at?: unknown | null;
 };
-
-function githubHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-  };
-  const token = process.env.GITHUB_TOKEN;
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
-}
 
 function summarizeReviews(
   reviews: ReviewItem[],
