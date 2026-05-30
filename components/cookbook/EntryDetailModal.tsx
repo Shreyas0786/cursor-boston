@@ -11,6 +11,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { CATEGORY_LABELS } from "@/lib/cookbook-labels";
+import { CLASS_GROUPS } from "@/lib/classname-constants";
 import { formatCookbookDate } from "@/lib/format-cookbook-date";
 import type { CookbookCategory, CookbookEntry } from "@/types/cookbook";
 import { PromptMarkdown } from "./PromptMarkdown";
@@ -119,7 +120,7 @@ export function EntryDetailModal({
                 <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1.5 uppercase tracking-wider">
                   Category
                 </span>
-                <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium rounded-full">
+                <span className={CLASS_GROUPS.tag.successPill}>
                   {CATEGORY_LABELS[entry.category as CookbookCategory] || entry.category}
                 </span>
               </div>
@@ -132,7 +133,7 @@ export function EntryDetailModal({
                     {(entry.worksWith ?? []).map((w) => (
                       <span
                         key={w}
-                        className="px-2.5 py-1 bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-medium rounded-full"
+                        className={CLASS_GROUPS.tag.neutralStrongPill}
                       >
                         {w}
                       </span>
@@ -149,7 +150,7 @@ export function EntryDetailModal({
                     {(entry.tags ?? []).map((tag) => (
                       <span
                         key={tag}
-                        className="px-2.5 py-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 text-xs font-medium rounded-full"
+                        className={CLASS_GROUPS.tag.neutralPill}
                       >
                         {tag}
                       </span>

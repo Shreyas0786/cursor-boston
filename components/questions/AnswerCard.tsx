@@ -8,6 +8,7 @@
 "use client";
 
 import { ThumbsUp, ThumbsDown, CheckCircle2 } from "lucide-react";
+import { formatShortDate } from "@/lib/format-helpers";
 import { CLASS_GROUPS, TAILWIND_CLASS_NAMES as TW } from "@/lib/classname-constants";
 import { cn } from "@/lib/utils";
 import type { Answer, VoteType } from "@/types/questions";
@@ -21,7 +22,7 @@ function timeAgo(dateStr: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+  return formatShortDate(dateStr);
 }
 
 export function AnswerCard({
