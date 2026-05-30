@@ -15,6 +15,7 @@ import type { Question, Answer, VoteType } from "@/types/questions";
 import type { CookbookEntry } from "@/types/cookbook";
 import { AnswerCard } from "./AnswerCard";
 import { AnswerComposer } from "./AnswerComposer";
+import { formatShortDate } from "@/lib/format-helpers";
 
 function timeAgo(dateStr: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -25,7 +26,7 @@ function timeAgo(dateStr: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+  return formatShortDate(dateStr);
 }
 
 async function fetchIdToken(firebaseUser: import("firebase/auth").User) {
@@ -70,6 +71,7 @@ export function QuestionDetail({
   }, [user]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch-on-mount; setUserVotes runs after the awaited fetch, not synchronously
     fetchVotes();
   }, [fetchVotes]);
 
