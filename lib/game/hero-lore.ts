@@ -23,7 +23,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Timestamp } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import { sanitizeText } from "@/lib/sanitize";
 import type { Caste, GameHeroDoc } from "./types";
 
@@ -34,8 +34,10 @@ const EPITAPHS = "epitaphs";
 export const MAX_CHAPTER_LENGTH = 2000;
 export const MAX_EPITAPH_LENGTH = 280;
 
+/** @internal */
 export type ChapterStatus = "pending" | "approved";
 
+/** @internal */
 export interface HeroChapter {
   id: string;
   heroId: string;
@@ -51,6 +53,7 @@ export interface HeroChapter {
   deletedByAdmin?: boolean;
 }
 
+/** @internal */
 export interface HeroEpitaph {
   id: string;
   heroId: string;
@@ -94,11 +97,6 @@ export class HeroNotFoundError extends Error {
   }
 }
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 async function loadHero(db: Firestore, heroId: string): Promise<GameHeroDoc> {
   const snap = await db.collection(HEROES).doc(heroId).get();

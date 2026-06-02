@@ -10,7 +10,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getVerifiedUser } from "@/lib/server-auth";
 import { logger } from "@/lib/logger";
-import { parseRequestBody } from "@/lib/api-response";
+import { getFirstValidationError, parseRequestBody } from "@/lib/api-response";
 import { getClientIdentifier } from "@/lib/rate-limit";
 import { checkUpstashRateLimit } from "@/lib/upstash-rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     });
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Invalid request body" },
+        { error: getFirstValidationError(parsed.error, "Invalid request body") },
         { status: 400 }
       );
     }

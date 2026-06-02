@@ -21,7 +21,7 @@
 import { randomUUID } from "node:crypto";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import { sanitizeText } from "@/lib/sanitize";
 import type { Caste, GameWorldMeta, Prophecy } from "./types";
 import { PROPHECY_BONUS_TURNS } from "./types";
@@ -70,11 +70,6 @@ export class ProphecyNotFoundError extends Error {
   }
 }
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 export async function createProphecyServer(args: {
   author: { userId: string; displayName: string; caste: Caste | null };
@@ -176,6 +171,7 @@ export async function deleteProphecyServer(args: {
  * must do all its other reads BEFORE calling this. We use a `getAll`
  * with the tx so we don't double-read.
  */
+/** @internal */
 export async function resolveProphesiesForSealInTx(args: {
   tx: Transaction;
   db: Firestore;

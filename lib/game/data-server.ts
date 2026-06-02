@@ -7,9 +7,8 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Timestamp, Transaction } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import {
-  applyBaseRegen,
   applyFlyoverModifiers,
   attributeAttackerLosses,
   attributeDefenderLosses,
@@ -22,6 +21,46 @@ import {
   resolveAttack,
   rollSpellEffectiveness,
 } from "./combat";
+import {
+  GAME_COLLECTIONS as COLLECTIONS,
+  WORLD_META_DOC,
+} from "./data-access/collections";
+import { defaultedWorldMeta, getWorldMetaServer } from "./data-access/world-meta";
+// Re-exported so existing `@/lib/game/data-server` importers keep working.
+export { getWorldMetaServer };
+import {
+  getAllMapTilesServer,
+  getAllOwnerSummariesServer,
+  getMapTilesInBoundsServer,
+  getMyMapServer,
+  getOwnedMapTilesServer,
+  getOwnedTilesServer,
+  getPlayerServer,
+  getTileServer,
+} from "./data-access/reads";
+// Re-exported so existing `@/lib/game/data-server` importers keep working.
+export {
+  getAllMapTilesServer,
+  getAllOwnerSummariesServer,
+  getMapTilesInBoundsServer,
+  getMyMapServer,
+  getOwnedMapTilesServer,
+  getOwnedTilesServer,
+  getPlayerServer,
+  getTileServer,
+};
+export type { MyMapView, OwnerSummary } from "./data-access/reads";
+import {
+  addStacks as addStack,
+  isValidUnitStack,
+  stackHasAtLeast,
+  subtractStack,
+  sumStack,
+} from "./unit-stack";
+import {
+  pickFrontierCandidate,
+  pickFrontierCandidatesBulk,
+} from "./frontier";
 import { ARTIFACTS_BY_ID, SPELLS_BY_ID } from "./content";
 import {
   ARMAGEDDON_TILE_GATE,
@@ -105,7 +144,6 @@ import {
   type HeroBattleAction,
   type IntelReport,
   type LandType,
-  type MapTile,
   type SealRecord,
   type SpecialUnitInstance,
   type SpellDefinition,
@@ -173,21 +211,18 @@ import {
   spawnPlayerLands,
   tileIdFromAxial,
 } from "./world-gen";
-import {
-  type FrontierSample,
-  distanceToNearestOwned,
-  hexCentroid,
-  kingdomRadiusFromCentroid,
-  ringCoords,
-  riskScore,
-} from "./exploration";
+import { type FrontierSample, hexCentroid } from "./exploration";
 
+/** @internal */
 export const ATTACK_TURN_COST = 1;
+/** @internal */
 export const SPELL_TURN_COST = 5;
+/** @internal */
 export const BUILD_UNITS_TURN_COST = 5;
 // Siege action: a deterministic infrastructure-degrading move. Costs 5
 // turns, applies SIEGE_ACTION_MAGNITUDE (0.10) to the target's
 // standing-defense floor, stacks up to SIEGE_DEBUFF_MAX_MAGNITUDE.
+/** @internal */
 export const SIEGE_TURN_COST = 5;
 // Recruit rate is per-land-type as of the May 2026 mechanics rework:
 // food/magic tiles now recruit at half the military rate, since training
@@ -197,7 +232,9 @@ export const SIEGE_TURN_COST = 5;
 // `BUILD_UNITS_PER_TURN` is kept exported as the military baseline so any
 // external consumer reading "the recruit rate" still sees a sensible value;
 // internal cycle math uses `unitsPerTurnForLand(landType)`.
+/** @internal */
 export const BUILD_UNITS_PER_TURN = 10;
+/** @internal */
 export const BUILD_UNITS_PER_TURN_BY_LAND: Record<LandType, number> = {
   unrevealed: 0,
   unassigned: 0,
@@ -205,6 +242,7 @@ export const BUILD_UNITS_PER_TURN_BY_LAND: Record<LandType, number> = {
   food: 5,
   magic: 5,
 };
+/** @internal */
 export function unitsPerTurnForLand(landType: LandType): number {
   return BUILD_UNITS_PER_TURN_BY_LAND[landType] ?? 0;
 }
@@ -360,102 +398,119 @@ function magicHeroSpellMultiplier(
 // -15% defense floor until the player grows neighbors around it.
 export const FAR_EXPEDITION_TURN_COST = 2;
 
+/** @internal */
 export class GamePlayerNotFoundError extends Error {
   constructor() {
     super("Game player not found");
     this.name = "GamePlayerNotFoundError";
   }
 }
+/** @internal */
 export class GamePlayerAlreadyExistsError extends Error {
   constructor() {
     super("Game player already exists");
     this.name = "GamePlayerAlreadyExistsError";
   }
 }
+/** @internal */
 export class GameTileNotFoundError extends Error {
   constructor() {
     super("Tile not found");
     this.name = "GameTileNotFoundError";
   }
 }
+/** @internal */
 export class GameTileNotOwnedError extends Error {
   constructor() {
     super("Tile not owned by player");
     this.name = "GameTileNotOwnedError";
   }
 }
+/** @internal */
 export class GameInvalidPhaseError extends Error {
   constructor(expected: string, actual: string) {
     super(`Invalid phase: expected ${expected}, got ${actual}`);
     this.name = "GameInvalidPhaseError";
   }
 }
+/** @internal */
 export class GameInsufficientTurnsError extends Error {
   constructor(required: number, have: number) {
     super(`Insufficient turns: need ${required}, have ${have}`);
     this.name = "GameInsufficientTurnsError";
   }
 }
+/** @internal */
 export class GameNoUnrevealedTilesError extends Error {
   constructor() {
     super("No unrevealed tiles remaining to explore");
     this.name = "GameNoUnrevealedTilesError";
   }
 }
+/** @internal */
 export class GameAlreadyRevealedError extends Error {
   constructor() {
     super("Tile is already revealed");
     this.name = "GameAlreadyRevealedError";
   }
 }
+/** @internal */
 export class GameTileUnrevealedError extends Error {
   constructor() {
     super("Tile must be revealed via explore before it can be distributed");
     this.name = "GameTileUnrevealedError";
   }
 }
+/** @internal */
 export class GameCasteAlreadySetError extends Error {
   constructor() {
     super("Caste already chosen and locked");
     this.name = "GameCasteAlreadySetError";
   }
 }
+/** @internal */
 export class GameCasteChangeUnavailableError extends Error {
   constructor(reason: string) {
     super(`Caste change unavailable: ${reason}`);
     this.name = "GameCasteChangeUnavailableError";
   }
 }
+/** @internal */
 export class GameInvalidLandTypeError extends Error {
   constructor(t: string) {
     super(`Invalid land type for distribute: ${t}`);
     this.name = "GameInvalidLandTypeError";
   }
 }
+/** @internal */
 export class GameInvalidCasteError extends Error {
   constructor(c: string) {
     super(`Invalid caste: ${c}`);
     this.name = "GameInvalidCasteError";
   }
 }
+/** @internal */
 export class GameShieldedError extends Error {
   constructor(side: "attacker" | "defender") {
     super(`Action blocked: ${side} is under the new-player shield wall`);
     this.name = "GameShieldedError";
   }
 }
+/** @internal */
 export class GameNotAdjacentError extends Error {
   constructor() {
     super("Source tile does not border the target tile");
     this.name = "GameNotAdjacentError";
   }
 }
+/** @internal */
 export class GameSelfAttackError extends Error {
   constructor() {
     super("Cannot attack a tile you own");
     this.name = "GameSelfAttackError";
   }
 }
+/** @internal */
 export class GameTileFullError extends Error {
   constructor(public availableSpace: number, public requested: number) {
     super(
@@ -464,18 +519,21 @@ export class GameTileFullError extends Error {
     this.name = "GameTileFullError";
   }
 }
+/** @internal */
 export class GameInsufficientUnitsError extends Error {
   constructor() {
     super("Source tile does not have the requested units");
     this.name = "GameInsufficientUnitsError";
   }
 }
+/** @internal */
 export class GameInvalidSpellError extends Error {
   constructor(reason: string) {
     super(`Invalid spell: ${reason}`);
     this.name = "GameInvalidSpellError";
   }
 }
+/** @internal */
 export class GameUnitCapExceededError extends Error {
   constructor(public cap: number, public currentTotal: number) {
     super(
@@ -484,12 +542,14 @@ export class GameUnitCapExceededError extends Error {
     this.name = "GameUnitCapExceededError";
   }
 }
+/** @internal */
 export class GameTileTypeError extends Error {
   constructor(expected: string, got: string) {
     super(`Tile must be ${expected}, got ${got}`);
     this.name = "GameTileTypeError";
   }
 }
+/** @internal */
 export class GameFrontierExhaustedError extends Error {
   constructor() {
     super(
@@ -498,42 +558,49 @@ export class GameFrontierExhaustedError extends Error {
     this.name = "GameFrontierExhaustedError";
   }
 }
+/** @internal */
 export class GameArtifactNotFoundError extends Error {
   constructor() {
     super("Artifact not found");
     this.name = "GameArtifactNotFoundError";
   }
 }
+/** @internal */
 export class GameArtifactAlreadyUsedError extends Error {
   constructor() {
     super("Artifact has already been used");
     this.name = "GameArtifactAlreadyUsedError";
   }
 }
+/** @internal */
 export class GamePlayerBioTooLongError extends Error {
   constructor() {
     super("Bio cannot exceed 500 characters");
     this.name = "GamePlayerBioTooLongError";
   }
 }
+/** @internal */
 export class GameInscriptionTooLongError extends Error {
   constructor() {
     super("Inscription cannot exceed 120 characters");
     this.name = "GameInscriptionTooLongError";
   }
 }
+/** @internal */
 export class GameInvalidNameError extends Error {
   constructor(reason: string) {
     super(`Invalid general name: ${reason}`);
     this.name = "GameInvalidNameError";
   }
 }
+/** @internal */
 export class GameNameTakenError extends Error {
   constructor() {
     super("That general name is already in use");
     this.name = "GameNameTakenError";
   }
 }
+/** @internal */
 export class GameNoEnemyKingdomsError extends Error {
   constructor() {
     super(
@@ -543,6 +610,7 @@ export class GameNoEnemyKingdomsError extends Error {
   }
 }
 
+/** @internal */
 export class GameArmageddonInProgressError extends Error {
   constructor() {
     super(
@@ -552,6 +620,7 @@ export class GameArmageddonInProgressError extends Error {
   }
 }
 
+/** @internal */
 export class GameStaleSeasonError extends Error {
   constructor(playerSeason: number, worldSeason: number) {
     super(
@@ -561,6 +630,7 @@ export class GameStaleSeasonError extends Error {
   }
 }
 
+/** @internal */
 export class GameSealsExhaustedError extends Error {
   constructor() {
     super(
@@ -572,6 +642,7 @@ export class GameSealsExhaustedError extends Error {
 
 /** Thrown when summon/unsummon references a special-unit instance the
  *  player doesn't have in their pool. */
+/** @internal */
 export class GameSpecialUnitNotFoundError extends Error {
   constructor(instanceId: string) {
     super(`Special unit instance ${instanceId} not found in your pool.`);
@@ -582,6 +653,7 @@ export class GameSpecialUnitNotFoundError extends Error {
 /** Thrown when a special-unit summon targets a tile that already has the
  *  same instance stationed (idempotency guard) or is already stationed
  *  somewhere else (caller must unsummon first). */
+/** @internal */
 export class GameSpecialUnitAlreadyStationedError extends Error {
   constructor() {
     super(
@@ -592,6 +664,7 @@ export class GameSpecialUnitAlreadyStationedError extends Error {
 }
 
 // Zero-turn gameplay errors -----------------------------------------------
+/** @internal */
 export class GameDefensiveStanceBlockedError extends Error {
   constructor() {
     super(
@@ -600,6 +673,7 @@ export class GameDefensiveStanceBlockedError extends Error {
     this.name = "GameDefensiveStanceBlockedError";
   }
 }
+/** @internal */
 export class GameDefensiveStanceLockedError extends Error {
   constructor() {
     super(
@@ -608,90 +682,76 @@ export class GameDefensiveStanceLockedError extends Error {
     this.name = "GameDefensiveStanceLockedError";
   }
 }
+/** @internal */
 export class GameDefensiveStanceCapError extends Error {
   constructor(public cap: number) {
     super(`You can have at most ${cap} tile(s) in defensive stance.`);
     this.name = "GameDefensiveStanceCapError";
   }
 }
+/** @internal */
 export class GameMeditationSlotFullError extends Error {
   constructor() {
     super("You already have a hero in meditation.");
     this.name = "GameMeditationSlotFullError";
   }
 }
+/** @internal */
 export class GameHeroAlreadyMeditatingError extends Error {
   constructor() {
     super("That hero is already meditating.");
     this.name = "GameHeroAlreadyMeditatingError";
   }
 }
+/** @internal */
 export class GameHeroNotOwnedError extends Error {
   constructor() {
     super("That hero is not yours.");
     this.name = "GameHeroNotOwnedError";
   }
 }
+/** @internal */
 export class GameHeroNotFoundError extends Error {
   constructor() {
     super("Hero not found.");
     this.name = "GameHeroNotFoundError";
   }
 }
+/** @internal */
 export class GamePepTalkRequiresZeroTurnsError extends Error {
   constructor() {
     super("Pep talks are only available when you have 0 turns remaining.");
     this.name = "GamePepTalkRequiresZeroTurnsError";
   }
 }
+/** @internal */
 export class GameRedistributeRateLimitError extends Error {
   constructor(public retryAfterMs: number) {
     super("You've used your daily redistribution allowance.");
     this.name = "GameRedistributeRateLimitError";
   }
 }
+/** @internal */
 export class GameLastStandCooldownError extends Error {
   constructor(public retryAfterMs: number) {
     super("Last Stand is still on cooldown.");
     this.name = "GameLastStandCooldownError";
   }
 }
+/** @internal */
 export class GameLastStandRequiresZeroTurnsError extends Error {
   constructor() {
     super("Last Stand is only available when you have 0 turns remaining.");
     this.name = "GameLastStandRequiresZeroTurnsError";
   }
 }
+/** @internal */
 export class GameLastStandNoThreatError extends Error {
   constructor() {
     super("No inbound attack threat detected on that tile.");
     this.name = "GameLastStandNoThreatError";
   }
 }
-
-const COLLECTIONS = {
-  PLAYERS: "game_players",
-  TILES: "game_tiles",
-  ATTACKS: "game_attacks",
-  WORLD_META: "game_world_meta",
-  ARTIFACTS: "game_artifacts",
-  // Community feed: append-only event log of player actions (joins,
-  // caste picks, attacks, milestones). Read by the dashboard's
-  // CommunityPanel. Writes are Admin-SDK only.
-  COMMUNITY_EVENTS: "game_community_events",
-  // Community chat: free-form messages from authenticated players,
-  // moderated by author or by an admin (delete-only).
-  COMMUNITY_MESSAGES: "game_community_messages",
-  // End-game / Armageddon hall-of-fame: one doc per past Armageddon
-  // (doc id = seasonNumber). Persisted before the wipe so the record
-  // survives even if the resolver crashes mid-batch.
-  ARMAGEDDON_EVENTS: "game_armageddon_events",
-  // Zero-turn gameplay: queued battle plans that execute at next weekly
-  // grant. Owned by player; writes Admin-SDK only.
-  ORDER_QUEUE: "game_order_queue",
-} as const;
-
-const WORLD_META_DOC = "singleton";
 
 // Land types you can distribute a tile to. "unassigned" is allowed so the
 // player can revert a tile back (and pay 1 turn for the privilege); they
@@ -705,31 +765,12 @@ const VALID_DISTRIBUTABLE_TYPES = new Set<LandType>([
 ]);
 const VALID_CASTES = new Set<Caste>(["black", "red", "white", "green", "blue"]);
 
-function adminDbOrThrow() {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 // ── End-game / Armageddon helpers ─────────────────────────────────────
 // Coalesce a possibly-pre-Armageddon worldMeta doc to a full GameWorldMeta
 // with safe defaults. Pre-Armageddon docs (and freshly-bootstrapped envs)
 // don't have sealsBroken / armageddonState / seasonNumber set; treat
 // season as 1 and state as "active" so legacy reads behave correctly.
-function defaultedWorldMeta(raw: Partial<GameWorldMeta> | undefined): GameWorldMeta {
-  return {
-    playerCount: raw?.playerCount ?? 0,
-    seasonNumber: raw?.seasonNumber ?? 1,
-    sealsBroken: raw?.sealsBroken ?? 0,
-    seals: raw?.seals ?? [],
-    armageddonState: raw?.armageddonState ?? "active",
-    armageddonStartedAt: raw?.armageddonStartedAt,
-    armageddonResolvedAt: raw?.armageddonResolvedAt,
-    lastSpawnAt: raw?.lastSpawnAt,
-    updatedAt: raw?.updatedAt,
-  };
-}
-
 /** Refuses turn-spending actions while the world is being remade. Also
  *  refuses stale player docs (left over from a prior season after a
  *  partial wipe — should be rare since the resolver deletes them, but
@@ -760,18 +801,6 @@ async function readWorldMetaInTx(
   const snap = await tx.get(ref);
   const raw = snap.exists ? (snap.data() as Partial<GameWorldMeta>) : undefined;
   return { meta: defaultedWorldMeta(raw), ref };
-}
-
-/** Read-only world-meta fetch for dashboard / hall-of-fame surfacing.
- *  Returns the defaulted shape even when the doc doesn't exist yet. */
-export async function getWorldMetaServer(): Promise<GameWorldMeta> {
-  const db = adminDbOrThrow();
-  const snap = await db
-    .collection(COLLECTIONS.WORLD_META)
-    .doc(WORLD_META_DOC)
-    .get();
-  const raw = snap.exists ? (snap.data() as Partial<GameWorldMeta>) : undefined;
-  return defaultedWorldMeta(raw);
 }
 
 // Rolls (3% chance) for an artifact and stages a tx.set() to persist it if
@@ -822,386 +851,10 @@ function makeNarrativeRng(
   return makeSeededRng(`narrative:${userId}:${turnIndex}:${action}`);
 }
 
-export async function getPlayerServer(
-  userId: string
-): Promise<GamePlayer | null> {
-  const db = adminDbOrThrow();
-  const snap = await db.collection(COLLECTIONS.PLAYERS).doc(userId).get();
-  return snap.exists ? (snap.data() as GamePlayer) : null;
-}
-
-export async function getOwnedTilesServer(userId: string): Promise<GameTile[]> {
-  const db = adminDbOrThrow();
-  const snap = await db
-    .collection(COLLECTIONS.TILES)
-    .where("ownerId", "==", userId)
-    .get();
-  const playerSnap = await db.collection(COLLECTIONS.PLAYERS).doc(userId).get();
-  const player = playerSnap.exists ? (playerSnap.data() as GamePlayer) : null;
-  const tiles = snap.docs.map((d) => d.data() as GameTile);
-  return applyLazyRegenBatch(tiles, player, new Date());
-}
-
-// In-memory + fire-and-forget Firestore writeback of BASE regen across a
-// batch of tiles. Returns the regenerated tiles. Writes only fire for tiles
-// where the BASE delta is non-zero (avoids write storms on read-heavy paths).
-// The writes are not awaited — the caller's response uses the in-memory
-// regen result; the next request reads the persisted values.
-function applyLazyRegenBatch(
-  tiles: GameTile[],
-  player: GamePlayer | null,
-  now: Date
-): GameTile[] {
-  const db = adminDbOrThrow();
-  const out: GameTile[] = [];
-  for (const t of tiles) {
-    out.push(applyLazyRegen(t, player, now, db));
-  }
-  return out;
-}
-
-function applyLazyRegen(
-  tile: GameTile,
-  player: GamePlayer | null,
-  now: Date,
-  db: Firestore
-): GameTile {
-  if (!tile.ownerId) return tile;
-  const currentBase = tile.baseUnits ?? { ground: 0, siege: 0, air: 0 };
-  const target = baseUnitsTarget({
-    landType: tile.type,
-    caste: player?.caste ?? null,
-    upgradeIds: tile.upgradeIds,
-    intrinsicBuffs: tile.intrinsicBuffs,
-    createdAt:
-      tile.createdAt instanceof Date
-        ? tile.createdAt
-        : typeof (tile.createdAt as Timestamp | undefined)?.toDate === "function"
-          ? (tile.createdAt as Timestamp).toDate()
-          : undefined,
-    activeUpgrades: player?.activeUpgrades ?? {},
-    productionSpellsActive: player?.productionSpellsActive,
-    now,
-  });
-  const baseRegenedAt =
-    tile.baseRegenedAt instanceof Date
-      ? tile.baseRegenedAt
-      : typeof (tile.baseRegenedAt as Timestamp | undefined)?.toDate ===
-          "function"
-        ? (tile.baseRegenedAt as Timestamp).toDate()
-        : tile.createdAt instanceof Date
-          ? tile.createdAt
-          : typeof (tile.createdAt as Timestamp | undefined)?.toDate ===
-              "function"
-            ? (tile.createdAt as Timestamp).toDate()
-            : now;
-  const result = applyBaseRegen({
-    currentBase,
-    target,
-    landType: tile.type,
-    baseRegenedAt,
-    now,
-  });
-  if (result.deltaUnits <= 0) return tile;
-  // Fire-and-forget Firestore writeback. Failures are logged inside the
-  // surrounding logger; we don't await so the read path stays snappy.
-  db.collection(COLLECTIONS.TILES)
-    .doc(tile.tileId)
-    .update({
-      baseUnits: result.baseUnits,
-      baseRegenedAt: result.baseRegenedAt,
-    })
-    .catch((e) => {
-      logger.warn("applyLazyRegen writeback failed", {
-        tileId: tile.tileId,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    });
-  return {
-    ...tile,
-    baseUnits: result.baseUnits,
-    baseRegenedAt: result.baseRegenedAt,
-  };
-}
-
-// Lightweight tile fetch — uses Firestore's select() to only pull the fields
-// the map/dashboard need. Same Firestore read cost (Firestore charges per
-// doc, not per field), but ~60-70% smaller wire payload and JSON parse cost.
-// For a 200-tile player this drops the response from ~200KB to ~70KB.
-export async function getOwnedMapTilesServer(
-  userId: string
-): Promise<MapTile[]> {
-  const db = adminDbOrThrow();
-  const snap = await db
-    .collection(COLLECTIONS.TILES)
-    .where("ownerId", "==", userId)
-    .select(
-      "tileId",
-      "q",
-      "r",
-      "type",
-      "ownerId",
-      "units",
-      "baseUnits",
-      "armedDefenseSpellId",
-      "hero"
-    )
-    .get();
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return {
-      tileId: data.tileId,
-      q: data.q,
-      r: data.r,
-      type: data.type,
-      ownerId: data.ownerId ?? null,
-      units: data.units,
-      baseUnits: data.baseUnits ?? { ground: 0, siege: 0, air: 0 },
-      armedDefenseSpellId: data.armedDefenseSpellId ?? null,
-      ...(data.hero ? { hero: data.hero } : {}),
-    } as MapTile;
-  });
-}
-
-// Global map view. Returns every tile in the world with the lightweight
-// MapTile projection. The whole world today is ~500 tiles (one batch); if it
-// grows beyond a few thousand, callers should switch to
-// `getMapTilesInBoundsServer` (viewport bounding-box).
-export async function getAllMapTilesServer(): Promise<MapTile[]> {
-  const db = adminDbOrThrow();
-  const snap = await db
-    .collection(COLLECTIONS.TILES)
-    .select(
-      "tileId",
-      "q",
-      "r",
-      "type",
-      "ownerId",
-      "units",
-      "baseUnits",
-      "armedDefenseSpellId",
-      "hero"
-    )
-    .get();
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return {
-      tileId: data.tileId,
-      q: data.q,
-      r: data.r,
-      type: data.type,
-      ownerId: data.ownerId ?? null,
-      units: data.units,
-      baseUnits: data.baseUnits ?? { ground: 0, siege: 0, air: 0 },
-      armedDefenseSpellId: data.armedDefenseSpellId ?? null,
-      ...(data.hero ? { hero: data.hero } : {}),
-    } as MapTile;
-  });
-}
-
-// Hard cap on the number of tiles a viewport bbox query may return. Keeps a
-// runaway zoomed-out fetch from accidentally pulling the whole world.
-const VIEWPORT_TILE_LIMIT = 5000;
-
-// Viewport-bounded version of getAllMapTilesServer. Single-field range query
-// on `q` (no composite index needed) plus an in-memory `r` filter — Firestore
-// only allows one inequality field per query in this style.
-//
-// At our hex spacing (~500 tiles per world today), the in-memory `r` filter
-// scans the full q-band; for a roughly square world this is approximately
-// the bbox area. For larger worlds add a composite index on (q ASC, r ASC)
-// and switch to two-field range; at 500 tiles the simple form is fine.
-export async function getMapTilesInBoundsServer(bounds: {
-  qMin: number;
-  qMax: number;
-  rMin: number;
-  rMax: number;
-}): Promise<MapTile[]> {
-  const db = adminDbOrThrow();
-  const snap = await db
-    .collection(COLLECTIONS.TILES)
-    .where("q", ">=", bounds.qMin)
-    .where("q", "<=", bounds.qMax)
-    .select(
-      "tileId",
-      "q",
-      "r",
-      "type",
-      "ownerId",
-      "units",
-      "baseUnits",
-      "armedDefenseSpellId",
-      "hero"
-    )
-    .limit(VIEWPORT_TILE_LIMIT + 1)
-    .get();
-  if (snap.size > VIEWPORT_TILE_LIMIT) {
-    throw new Error(
-      `getMapTilesInBoundsServer: bbox returned more than ${VIEWPORT_TILE_LIMIT} tiles; narrow the range`
-    );
-  }
-  const out: MapTile[] = [];
-  for (const d of snap.docs) {
-    const data = d.data();
-    if (typeof data.r !== "number") continue;
-    if (data.r < bounds.rMin || data.r > bounds.rMax) continue;
-    out.push({
-      tileId: data.tileId,
-      q: data.q,
-      r: data.r,
-      type: data.type,
-      ownerId: data.ownerId ?? null,
-      units: data.units,
-      baseUnits: data.baseUnits ?? { ground: 0, siege: 0, air: 0 },
-      armedDefenseSpellId: data.armedDefenseSpellId ?? null,
-      ...(data.hero ? { hero: data.hero } : {}),
-    } as MapTile);
-  }
-  return out;
-}
-
-export interface OwnerSummary {
-  userId: string;
-  displayName: string;
-  caste: Caste | null;
-  shielded: boolean;
-  /** True when this player is a seeded NPC. Real humans have the field
-   *  unset on their player doc; we surface explicit `false` for them so
-   *  client-side filters can rely on the boolean. */
-  isNpc: boolean;
-}
-
-// Personal map view: my tiles + the *enemy* tiles that share an edge with
-// any of my tiles + owner summaries for those enemies. Designed to be the
-// default fetch for /game/tiles, /game/spells, /game/recruit — the rest of
-// the world isn't relevant to those pages.
-//
-// Read cost: 1 query (own tiles) + 1 batched docRef.getAll() for the
-// border ring + 1 batched docRef.getAll() for owner summaries. For a
-// 25-tile spawn cluster: ~25 + ~30 + ~5 = ~60 reads (vs ~500 for the
-// full-world fetch). Scales with kingdom perimeter, not world size.
-export interface MyMapView {
-  myTiles: MapTile[];
-  borderTiles: MapTile[];
-  owners: OwnerSummary[];
-}
-
-export async function getMyMapServer(
-  userId: string,
-  now: Date = new Date()
-): Promise<MyMapView> {
-  const db = adminDbOrThrow();
-  const myTiles = await getOwnedMapTilesServer(userId);
-  if (myTiles.length === 0) {
-    return { myTiles: [], borderTiles: [], owners: [] };
-  }
-
-  // Build the set of neighbor tile ids that are NOT mine.
-  const myIds = new Set(myTiles.map((t) => t.tileId));
-  const neighborIds = new Set<string>();
-  for (const t of myTiles) {
-    for (const id of neighborTileIds(t.q, t.r)) {
-      if (!myIds.has(id)) neighborIds.add(id);
-    }
-  }
-
-  // Batch-fetch the border ring. We could pre-filter to only-existent docs,
-  // but db.getAll handles missing docs cheaply (returns non-existent
-  // snapshots) so a single round-trip is fine.
-  const borderTiles: MapTile[] = [];
-  const enemyOwnerIds = new Set<string>();
-  if (neighborIds.size > 0) {
-    const refs = [...neighborIds].map((id) =>
-      db.collection(COLLECTIONS.TILES).doc(id)
-    );
-    const snaps = await db.getAll(...refs);
-    for (const s of snaps) {
-      if (!s.exists) continue;
-      const data = s.data()!;
-      // Per spec: only enemy tiles. Skip unowned and self-owned border
-      // tiles entirely. Unowned-but-revealed neighbors don't load —
-      // there's no enemy presence there to display.
-      if (!data.ownerId || data.ownerId === userId) continue;
-      borderTiles.push({
-        tileId: data.tileId,
-        q: data.q,
-        r: data.r,
-        type: data.type,
-        ownerId: data.ownerId,
-        units: data.units,
-        baseUnits: data.baseUnits ?? { ground: 0, siege: 0, air: 0 },
-        armedDefenseSpellId: data.armedDefenseSpellId ?? null,
-      });
-      enemyOwnerIds.add(data.ownerId);
-    }
-  }
-
-  // Owner summaries for the enemies on our border.
-  const owners: OwnerSummary[] = [];
-  if (enemyOwnerIds.size > 0) {
-    const ownerRefs = [...enemyOwnerIds].map((uid) =>
-      db.collection(COLLECTIONS.PLAYERS).doc(uid)
-    );
-    const ownerSnaps = await db.getAll(...ownerRefs);
-    for (const s of ownerSnaps) {
-      if (!s.exists) continue;
-      const p = s.data() as GamePlayer;
-      owners.push({
-        userId: p.userId,
-        displayName: p.displayName ?? "",
-        caste: p.caste ?? null,
-        shielded: isShieldActive(p, now),
-        isNpc: (p as { isNpc?: boolean }).isNpc === true,
-      });
-    }
-  }
-
-  return { myTiles, borderTiles, owners };
-}
-
-// Owner-side metadata for the global map: name, caste, shield status. One
-// record per player; the client joins it onto tiles by ownerId.
-export async function getAllOwnerSummariesServer(
-  now: Date = new Date()
-): Promise<OwnerSummary[]> {
-  const db = adminDbOrThrow();
-  const snap = await db
-    .collection(COLLECTIONS.PLAYERS)
-    .select(
-      "userId",
-      "displayName",
-      "caste",
-      "shieldUntil",
-      "shieldDropAtTurn",
-      "turnsSpentTotal",
-      "isNpc"
-    )
-    .get();
-  return snap.docs.map((d) => {
-    const data = d.data() as GamePlayer & { isNpc?: boolean };
-    return {
-      userId: data.userId,
-      displayName: data.displayName ?? "",
-      caste: data.caste ?? null,
-      shielded: isShieldActive(data, now),
-      isNpc: data.isNpc === true,
-    };
-  });
-}
-
-export async function getTileServer(tileId: string): Promise<GameTile | null> {
-  const db = adminDbOrThrow();
-  const snap = await db.collection(COLLECTIONS.TILES).doc(tileId).get();
-  if (!snap.exists) return null;
-  const tile = snap.data() as GameTile;
-  if (!tile.ownerId) return tile;
-  const playerSnap = await db
-    .collection(COLLECTIONS.PLAYERS)
-    .doc(tile.ownerId)
-    .get();
-  const player = playerSnap.exists ? (playerSnap.data() as GamePlayer) : null;
-  return applyLazyRegen(tile, player, new Date(), db);
-}
+// Read-only queries (getPlayerServer, getOwnedTilesServer, the MapTile
+// projections, getMyMapServer, getAllOwnerSummariesServer, getTileServer)
+// plus the OwnerSummary/MyMapView types live in ./data-access/reads — see
+// the import + re-export near the top of this file.
 
 // v2 — new players spawn with 25 already-revealed unassigned tiles, skipping
 // the v1 "explore" phase entirely. Existing v1 player records aren't touched.
@@ -1209,6 +862,7 @@ export async function getTileServer(tileId: string): Promise<GameTile | null> {
 // the v1 "explore" phase was reinstated as the first step of the onboarding
 // wizard. All 100 are claimed-but-unrevealed at spawn; the wizard drives the
 // player through revealing them via setupExploreServer (1 turn each).
+/** @internal */
 export const NEW_PLAYER_TILE_COUNT = 100;
 const NEW_PLAYER_CONTIGUOUS = 80;
 const NEW_PLAYER_EXCLAVES_MIN = 3;
@@ -1792,6 +1446,7 @@ export async function bulkDistributeTilesServer(
 // caste pick (chooseCasteServer) is treated as "experimental" — once the
 // player reaches this many tiles held they can switch castes once more,
 // and that second pick is permanent (casteChangesUsed flips to 1).
+/** @internal */
 export const CASTE_CHANGE_TILES_THRESHOLD = 1000;
 
 // One-time caste switch after the player has built up real territory. Same
@@ -1909,49 +1564,9 @@ export async function chooseCasteServer(
   });
 }
 
-function sumStack(s: UnitStack): number {
-  return s.ground + s.siege + s.air;
-}
-
-function addStack(a: UnitStack, b: UnitStack): UnitStack {
-  return {
-    ground: a.ground + b.ground,
-    siege: a.siege + b.siege,
-    air: a.air + b.air,
-  };
-}
-
-function subtractStack(a: UnitStack, b: UnitStack): UnitStack {
-  return {
-    ground: Math.max(0, a.ground - b.ground),
-    siege: Math.max(0, a.siege - b.siege),
-    air: Math.max(0, a.air - b.air),
-  };
-}
-
-function stackHasAtLeast(have: UnitStack, need: UnitStack): boolean {
-  return (
-    have.ground >= need.ground &&
-    have.siege >= need.siege &&
-    have.air >= need.air
-  );
-}
-
-function isValidUnitStack(s: unknown): s is UnitStack {
-  if (!s || typeof s !== "object") return false;
-  const obj = s as Record<string, unknown>;
-  return (
-    typeof obj.ground === "number" &&
-    typeof obj.siege === "number" &&
-    typeof obj.air === "number" &&
-    obj.ground >= 0 &&
-    obj.siege >= 0 &&
-    obj.air >= 0 &&
-    Number.isInteger(obj.ground) &&
-    Number.isInteger(obj.siege) &&
-    Number.isInteger(obj.air)
-  );
-}
+// Unit-stack arithmetic (sumStack/addStack/subtractStack/stackHasAtLeast/
+// isValidUnitStack) lives in ./unit-stack — see the import above. `addStack`
+// is the local alias for the canonical `addStacks`.
 
 // Counts the player's tiles by land type. Done OUTSIDE the build/attack
 // transactions because Firestore txns can't query — the count is at most one
@@ -2264,6 +1879,7 @@ export async function buildUnitsServer(
   });
 }
 
+/** @internal */
 export interface BulkBuildPlanEntry {
   tileId: string;
   unitType: UnitType;
@@ -5470,6 +5086,7 @@ export async function adminGrantUnitsServer(args: {
   });
 }
 
+/** @internal */
 export interface WeeklyRolloverSummary {
   weekStartIso: string;
   scanned: number;
@@ -5583,6 +5200,7 @@ export async function runWeeklyRolloverServer(
 
 // Case-insensitive uniqueness check. Excludes `excludeUserId` so a player
 // can re-save their own current name (no-op rename).
+/** @internal */
 export async function isGeneralNameTakenServer(
   name: string,
   excludeUserId?: string
@@ -5852,167 +5470,9 @@ export async function getPlayerEligibilityServer(
   };
 }
 
-// Maximum hex rings to scan when looking for an unclaimed frontier tile.
-// At our spacing this is roomy. If still nothing, refund the turn.
-const FRONTIER_MAX_RINGS = 12;
-
-// After this many tiles ever claimed via explore (v1 setup + v2 frontier
-// combined), the candidate picker switches from "ring-walk outward from the
-// owned-centroid" (which tightly globs new claims onto existing territory)
-// to a Monte Carlo sampler whose radius grows with each additional explore.
-// Pre-threshold keeps the random-then-glob feel of the early game; past it,
-// drops scatter further afield until they eventually reach other kingdoms.
-const EXPLORE_MONTE_CARLO_THRESHOLD = 150;
-// Random samples to try before falling back to a deterministic ring walk.
-const MONTE_CARLO_MAX_SAMPLES = 24;
-
-// Look up the owner of each of `coord`'s 6 neighbors and count those owned
-// by anyone other than `userId`. One batched getAll.
-async function countHostileNeighbors(
-  db: Firestore,
-  coord: AxialCoord,
-  userId: string
-): Promise<number> {
-  const ns = axialNeighbors(coord.q, coord.r);
-  const refs = ns.map((n) =>
-    db.collection(COLLECTIONS.TILES).doc(tileIdFromAxial(n.q, n.r))
-  );
-  const snaps = await db.getAll(...refs);
-  let hostileCount = 0;
-  for (const ns of snaps) {
-    if (!ns.exists) continue;
-    const data = ns.data();
-    if (data && data.ownerId && data.ownerId !== userId) hostileCount++;
-  }
-  return hostileCount;
-}
-
-async function buildFrontierSample(
-  db: Firestore,
-  userId: string,
-  coord: AxialCoord,
-  ownedTileIds: ReadonlyArray<string>
-): Promise<FrontierSample> {
-  const tileId = tileIdFromAxial(coord.q, coord.r);
-  const hostileCount = await countHostileNeighbors(db, coord, userId);
-  const distance = distanceToNearestOwned(coord, [...ownedTileIds]);
-  const distanceFinite = Number.isFinite(distance) ? distance : 0;
-  return {
-    tile: coord,
-    tileId,
-    distanceToCore: distanceFinite,
-    hostileNeighbors: hostileCount,
-    riskScore: riskScore({
-      hostileNeighbors: hostileCount,
-      distanceToCore: distanceFinite,
-    }),
-  };
-}
-
-/**
- * Pick an unclaimed tile coord and return a FrontierSample describing it
- * (distance, hostile-neighbor count, risk).
- *
- * Two-phase behavior:
- *   - tilesExplored < EXPLORE_MONTE_CARLO_THRESHOLD: walk hex rings outward
- *     from the owned-centroid (existing behavior). Drops cluster onto the
- *     player's territory, naturally globbing into a contiguous kingdom.
- *   - tilesExplored >= EXPLORE_MONTE_CARLO_THRESHOLD: Monte Carlo sample
- *     within a radius that grows by +1 per explore past the threshold,
- *     anchored on the centroid. Drops scatter outward and eventually reach
- *     other kingdoms. Falls back to a ring walk over the same radius if too
- *     many random picks collide with claimed tiles.
- *
- * The pre-fetch happens outside the transaction; the caller re-validates the
- * pick is still unclaimed inside the transaction.
- */
-async function pickFrontierCandidate(
-  db: Firestore,
-  userId: string,
-  ownedTileIds: ReadonlyArray<string>,
-  tilesHeld: number,
-  tilesExplored: number,
-  rng: () => number
-): Promise<FrontierSample | null> {
-  const center = hexCentroid([...ownedTileIds]);
-
-  if (tilesExplored < EXPLORE_MONTE_CARLO_THRESHOLD) {
-    const minRing = Math.max(1, 1 + Math.floor(tilesHeld / 40));
-    return await pickByRingWalk(
-      db,
-      userId,
-      ownedTileIds,
-      center,
-      minRing,
-      FRONTIER_MAX_RINGS,
-      rng
-    );
-  }
-
-  const kingdomRadius = kingdomRadiusFromCentroid(center, ownedTileIds);
-  const extra = tilesExplored - EXPLORE_MONTE_CARLO_THRESHOLD;
-  // +1 keeps us at least one ring outside the current blob even at threshold.
-  const maxRadius = kingdomRadius + extra + 1;
-
-  for (let i = 0; i < MONTE_CARLO_MAX_SAMPLES; i++) {
-    const r = 1 + Math.floor(rng() * maxRadius);
-    const ring = ringCoords(center, r);
-    if (ring.length === 0) continue;
-    const c = ring[Math.floor(rng() * ring.length)];
-    const tileId = tileIdFromAxial(c.q, c.r);
-    const snap = await db.collection(COLLECTIONS.TILES).doc(tileId).get();
-    if (!snap.exists) {
-      return await buildFrontierSample(db, userId, c, ownedTileIds);
-    }
-  }
-
-  // Fallback: deterministic ring walk over the same radius range. Ensures we
-  // return *something* if random samples all happened to hit claimed tiles.
-  return await pickByRingWalk(
-    db,
-    userId,
-    ownedTileIds,
-    center,
-    1,
-    maxRadius,
-    rng
-  );
-}
-
-async function pickByRingWalk(
-  db: Firestore,
-  userId: string,
-  ownedTileIds: ReadonlyArray<string>,
-  center: AxialCoord,
-  minRing: number,
-  maxRing: number,
-  rng: () => number
-): Promise<FrontierSample | null> {
-  for (let r = minRing; r <= maxRing; r++) {
-    const coords = ringCoords(center, r);
-    for (let i = coords.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [coords[i], coords[j]] = [coords[j], coords[i]];
-    }
-    if (coords.length === 0) continue;
-
-    const refs = coords.map((c) =>
-      db.collection(COLLECTIONS.TILES).doc(tileIdFromAxial(c.q, c.r))
-    );
-    const snaps = await db.getAll(...refs);
-
-    for (let i = 0; i < snaps.length; i++) {
-      if (snaps[i].exists) continue;
-      return await buildFrontierSample(
-        db,
-        userId,
-        coords[i],
-        ownedTileIds
-      );
-    }
-  }
-  return null;
-}
+// Frontier candidate selection (pickFrontierCandidate + ring-walk/Monte-Carlo
+// helpers and their tuning constants) lives in ./frontier — see the import
+// above. `frontierExploreServer` below orchestrates it inside a transaction.
 
 /**
  * Play-phase generative explore. Spends 1 turn to claim a brand-new tile
@@ -6465,213 +5925,6 @@ export async function farExpeditionExploreServer(
       artifact: rolled?.doc ?? null,
       targetEnemyTileId,
       enemyTile: enemyTileById.get(targetEnemyTileId) ?? null,
-    };
-  });
-}
-
-// Walk hex rings outward from `center`, batched-getAll each ring, accumulate
-// unclaimed coords. Stops when we hit `target` unclaimed coords or `maxRing`.
-async function collectUnclaimedByRingWalk(
-  db: Firestore,
-  center: AxialCoord,
-  minRing: number,
-  maxRing: number,
-  target: number,
-  rng: () => number
-): Promise<AxialCoord[]> {
-  const out: AxialCoord[] = [];
-  for (let r = minRing; r <= maxRing && out.length < target; r++) {
-    const coords = ringCoords(center, r);
-    for (let i = coords.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [coords[i], coords[j]] = [coords[j], coords[i]];
-    }
-    if (coords.length === 0) continue;
-    const refs = coords.map((c) =>
-      db.collection(COLLECTIONS.TILES).doc(tileIdFromAxial(c.q, c.r))
-    );
-    const snaps = await db.getAll(...refs);
-    for (let i = 0; i < snaps.length; i++) {
-      if (!snaps[i].exists) out.push(coords[i]);
-      if (out.length >= target) break;
-    }
-  }
-  return out;
-}
-
-// Random sample distinct (ring, slot) coords within `maxRadius` of `center`,
-// batch-getAll each batch, accumulate unclaimed coords. Stops at `target`
-// unclaimed coords or `maxSamples` random tries (whichever first).
-async function collectUnclaimedByMonteCarlo(
-  db: Firestore,
-  center: AxialCoord,
-  maxRadius: number,
-  target: number,
-  maxSamples: number,
-  rng: () => number
-): Promise<AxialCoord[]> {
-  if (maxRadius <= 0) return [];
-  const out: AxialCoord[] = [];
-  const seen = new Set<string>();
-  // Sample in small batches so we can stop early without over-fetching.
-  const BATCH_SIZE = 8;
-  let samplesUsed = 0;
-  while (out.length < target && samplesUsed < maxSamples) {
-    const batch: AxialCoord[] = [];
-    while (batch.length < BATCH_SIZE && samplesUsed < maxSamples) {
-      samplesUsed++;
-      const r = 1 + Math.floor(rng() * maxRadius);
-      const ring = ringCoords(center, r);
-      if (ring.length === 0) continue;
-      const c = ring[Math.floor(rng() * ring.length)];
-      const id = tileIdFromAxial(c.q, c.r);
-      if (seen.has(id)) continue;
-      seen.add(id);
-      batch.push(c);
-    }
-    if (batch.length === 0) break;
-    const refs = batch.map((c) =>
-      db.collection(COLLECTIONS.TILES).doc(tileIdFromAxial(c.q, c.r))
-    );
-    const snaps = await db.getAll(...refs);
-    for (let i = 0; i < snaps.length; i++) {
-      if (!snaps[i].exists) out.push(batch[i]);
-      if (out.length >= target) break;
-    }
-  }
-  return out;
-}
-
-// Pre-fetches up to `count` unclaimed frontier coords + their hostile-neighbor
-// counts via batched getAlls, then claims all of them in ONE transaction.
-// Each step inside the txn rolls its own artifact (seeded by per-step turn
-// index) and emits a TurnReport.
-//
-// Algorithm:
-//   1. Outside txn: collect unclaimed coords. Pre-threshold uses a centroid
-//      ring walk (existing behavior); post-threshold uses Monte Carlo within
-//      a radius that grows with `tilesExplored`, falling back to a ring walk
-//      over the same radius if the random tries don't fill the batch.
-//   2. Outside txn: one batched getAll for the unique union of all picked
-//      coords' neighbors, to compute hostile-neighbor counts (presentation).
-//   3. Inside txn: re-read the picked candidates; for each that's still
-//      unclaimed, run a step (turn debit, artifact roll, tile create, report).
-//      Skip + record stoppedEarly if too many were claimed by another player.
-//   4. One tx.update on the player at the end with accumulated turn debit.
-//
-// Caps batch at 50 to stay well under the 500-ops-per-txn limit and keep the
-// pre-fetch tractable in dense worlds.
-async function pickFrontierCandidatesBulk(
-  db: Firestore,
-  userId: string,
-  ownedTileIds: ReadonlyArray<string>,
-  tilesHeld: number,
-  tilesExplored: number,
-  count: number,
-  rng: () => number
-): Promise<FrontierSample[]> {
-  const center = hexCentroid([...ownedTileIds]);
-  const overscan = Math.max(5, Math.ceil(count * 1.5));
-  const useMonteCarlo = tilesExplored >= EXPLORE_MONTE_CARLO_THRESHOLD;
-
-  let unclaimed: AxialCoord[] = [];
-
-  if (!useMonteCarlo) {
-    const minRing = Math.max(1, 1 + Math.floor(tilesHeld / 40));
-    unclaimed = await collectUnclaimedByRingWalk(
-      db,
-      center,
-      minRing,
-      FRONTIER_MAX_RINGS,
-      overscan,
-      rng
-    );
-  } else {
-    const kingdomRadius = kingdomRadiusFromCentroid(center, ownedTileIds);
-    const extra = tilesExplored - EXPLORE_MONTE_CARLO_THRESHOLD;
-    const maxRadius = kingdomRadius + extra + 1;
-    unclaimed = await collectUnclaimedByMonteCarlo(
-      db,
-      center,
-      maxRadius,
-      overscan,
-      // Sample budget: enough to fill the batch with comfortable misses.
-      Math.max(MONTE_CARLO_MAX_SAMPLES, overscan * 4),
-      rng
-    );
-    if (unclaimed.length < count) {
-      // Fill any remaining slots from a deterministic ring walk over the
-      // same radius range so a sparse-RNG run still returns a usable batch.
-      const fallback = await collectUnclaimedByRingWalk(
-        db,
-        center,
-        1,
-        maxRadius,
-        overscan - unclaimed.length,
-        rng
-      );
-      const seen = new Set(
-        unclaimed.map((c) => tileIdFromAxial(c.q, c.r))
-      );
-      for (const c of fallback) {
-        const id = tileIdFromAxial(c.q, c.r);
-        if (!seen.has(id)) {
-          unclaimed.push(c);
-          seen.add(id);
-        }
-      }
-    }
-  }
-
-  if (unclaimed.length === 0) return [];
-  const picked = unclaimed.slice(0, count);
-  const pickedTileIdSet = new Set(
-    picked.map((c) => tileIdFromAxial(c.q, c.r))
-  );
-
-  // Collect the union of all neighbor tileIds (deduped, excluding picked
-  // candidates themselves so we don't waste a read on a coord we already
-  // know is unclaimed). One batched getAll.
-  const neighborIds = new Set<string>();
-  for (const c of picked) {
-    for (const n of axialNeighbors(c.q, c.r)) {
-      const id = tileIdFromAxial(n.q, n.r);
-      if (!pickedTileIdSet.has(id)) neighborIds.add(id);
-    }
-  }
-  const neighborOwnerById = new Map<string, string>();
-  if (neighborIds.size > 0) {
-    const neighborRefs = Array.from(neighborIds).map((id) =>
-      db.collection(COLLECTIONS.TILES).doc(id)
-    );
-    const neighborSnaps = await db.getAll(...neighborRefs);
-    for (const ns of neighborSnaps) {
-      if (!ns.exists) continue;
-      const data = ns.data();
-      if (data && typeof data.ownerId === "string") {
-        neighborOwnerById.set(ns.id, data.ownerId as string);
-      }
-    }
-  }
-
-  return picked.map((c) => {
-    const tileId = tileIdFromAxial(c.q, c.r);
-    let hostileCount = 0;
-    for (const n of axialNeighbors(c.q, c.r)) {
-      const owner = neighborOwnerById.get(tileIdFromAxial(n.q, n.r));
-      if (owner && owner !== userId) hostileCount++;
-    }
-    const distance = distanceToNearestOwned(c, [...ownedTileIds]);
-    const distanceFinite = Number.isFinite(distance) ? distance : 0;
-    return {
-      tile: c,
-      tileId,
-      distanceToCore: distanceFinite,
-      hostileNeighbors: hostileCount,
-      riskScore: riskScore({
-        hostileNeighbors: hostileCount,
-        distanceToCore: distanceFinite,
-      }),
     };
   });
 }

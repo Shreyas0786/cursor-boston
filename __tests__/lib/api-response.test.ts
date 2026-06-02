@@ -9,8 +9,10 @@ import {
   apiError,
   apiSuccess,
   parseRequestBody,
+  getFirstValidationError,
   ErrorCode,
 } from "@/lib/api-response";
+import { z } from "zod";
 
 describe("ErrorCode constants", () => {
   it("exposes the 8 documented codes", () => {
@@ -91,6 +93,39 @@ describe("apiSuccess", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body).toEqual({ success: true, id: "new" });
+  });
+});
+
+describe("getFirstValidationError", () => {
+  const schema = z.object({
+    name: z.string().min(1, "name is required"),
+    age: z.number().int("age must be an integer"),
+  });
+
+  it("returns the first issue's message", () => {
+    const result = schema.safeParse({ name: "", age: 1.5 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(getFirstValidationError(result.error)).toBe("name is required");
+    }
+  });
+
+  it("uses the default fallback when there are no issues", () => {
+    const empty = { issues: [] } as unknown as z.ZodError;
+    expect(getFirstValidationError(empty)).toBe("Invalid request");
+  });
+
+  it("honours a custom fallback when there are no issues", () => {
+    const empty = { issues: [] } as unknown as z.ZodError;
+    expect(getFirstValidationError(empty, "Bad query")).toBe("Bad query");
+  });
+
+  it("matches the legacy `issues[0]?.message ?? fallback` idiom it replaced", () => {
+    const result = schema.safeParse({ name: "ok", age: 2.5 });
+    if (!result.success) {
+      const legacy = result.error.issues[0]?.message ?? "Invalid body";
+      expect(getFirstValidationError(result.error, "Invalid body")).toBe(legacy);
+    }
   });
 });
 

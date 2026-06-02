@@ -8,6 +8,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { getGithubRepoPair } from "./github-recent-merged-prs";
+import { getGithubApiHeaders } from "./github-api-helpers";
 import { getAdminDb } from "./firebase-admin";
 import { logger } from "./logger";
 
@@ -39,6 +40,7 @@ export function verifyWebhookSignature(
 /**
  * Find Firebase user by GitHub login
  */
+/** @internal */
 export async function findUserByGitHubLogin(
   githubLogin: string
 ): Promise<string | null> {
@@ -104,14 +106,7 @@ export async function fetchPullRequestChangedFilenames(
   prNumber: number
 ): Promise<string[]> {
   const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/files`;
-  const headers: Record<string, string> = {
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-  };
-  const token = process.env.GITHUB_TOKEN;
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+  const headers = getGithubApiHeaders();
   try {
     const res = await fetch(url, { headers });
     if (!res.ok) return [];

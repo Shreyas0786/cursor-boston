@@ -20,7 +20,7 @@
  */
 
 import { FieldValue, Firestore } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import type {
   ReactionEmoji,
   ReactionMap,
@@ -31,11 +31,6 @@ import { REACTION_EMOJIS } from "./types";
 
 const TRACKERS_COLLECTION = "game_reactions";
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 export class ReactionInvalidScopeError extends Error {
   constructor() {
@@ -99,6 +94,7 @@ function targetDocRef(
   throw new ReactionInvalidScopeError();
 }
 
+/** @internal */
 export interface ToggleReactionResult {
   /** Whether the reaction is now present (true) or removed (false). */
   active: boolean;
@@ -169,6 +165,7 @@ export async function toggleReactionServer(args: {
  * of (scope, docId, emoji) triples. Used by the renderer to pre-fill
  * "you reacted" highlights on initial load. Batched read for cheapness.
  */
+/** @internal */
 export async function listUserReactionsServer(args: {
   userId: string;
   targets: Array<{

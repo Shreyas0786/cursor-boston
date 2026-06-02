@@ -31,18 +31,10 @@ import {
   type ResearchEntry,
   type ResearchType,
 } from "@/lib/research";
+import { formatShortDate } from "@/lib/format-helpers";
 
 interface ResearchCardProps {
   entry: ResearchEntry;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function relativeFromNow(iso: string, now: Date = new Date()): string {
@@ -54,7 +46,7 @@ function relativeFromNow(iso: string, now: Date = new Date()): string {
   if (diffDays === -1) return "yesterday";
   if (diffDays > 1 && diffDays < 30) return `in ${diffDays} days`;
   if (diffDays < -1 && diffDays > -30) return `${Math.abs(diffDays)} days ago`;
-  return formatDate(iso);
+  return formatShortDate(iso);
 }
 
 const TYPE_BADGE_STYLES: Record<ResearchType, string> = {
@@ -144,7 +136,7 @@ export function ResearchCard({ entry }: ResearchCardProps) {
       <header className="mb-2 flex items-start justify-between gap-3">
         <TypeBadge entry={entry} />
         <span className="text-xs text-neutral-500 dark:text-neutral-500">
-          {formatDate(entry.updatedAt ?? entry.postedAt)}
+          {formatShortDate(entry.updatedAt ?? entry.postedAt)}
           {entry.updatedAt ? " · updated" : ""}
         </span>
       </header>

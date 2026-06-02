@@ -15,7 +15,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import { sanitizeText } from "@/lib/sanitize";
 import type { Caste, Pact } from "./types";
 import { logCommunityEventInTx } from "./community";
@@ -61,11 +61,6 @@ export class PactNotFoundError extends Error {
   }
 }
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 interface PlayerDenorm {
   userId: string;
@@ -182,6 +177,7 @@ function pactExpiresAtMs(p: Pact): number {
  * subsequent `markPactsBrokenInTx` is responsible for the actual brokenAt
  * write inside the transaction.
  */
+/** @internal */
 export async function findActivePactsBetween(args: {
   db: Firestore;
   attackerId: string;
@@ -213,6 +209,7 @@ export async function findActivePactsBetween(args: {
  * still inside its window, sets `brokenAt` and posts a `pact_broken`
  * community event. No-op if no matching pact exists.
  */
+/** @internal */
 export async function markPactsBrokenInTx(args: {
   tx: Transaction;
   db: Firestore;

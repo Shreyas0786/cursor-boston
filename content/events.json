@@ -1,6 +1,89 @@
 {
   "upcoming": [
     {
+      "id": "cursor-boston-cohort1-end-hack-2026",
+      "slug": "cursor-boston-cohort1-end-hack-2026",
+      "title": "Cursor Boston — End of Cohort 1 Hack",
+      "subtitle": "Drop-in build day at Microsoft NERD to close out Summer Cohort 1",
+      "date": "2026-06-19",
+      "time": "9:00 AM – 7:00 PM ET",
+      "location": "Cambridge, MA",
+      "venue": {
+        "name": "Microsoft New England Research and Development Center",
+        "address": "1 Memorial Dr, Cambridge, MA 02142",
+        "mapUrl": null
+      },
+      "type": "hackathon",
+      "description": "Drop-in hack day at Microsoft NERD in Kendall Square to close out Summer Cohort 1. Come for the full day or swing by for a few hours — bring a project, pick one up from the wall, or pair with a cohort member on their Week 6 build. Open to everyone, not just cohort 1.",
+      "longDescription": "End of Cohort 1 — wahoo! A drop-in hack day at Microsoft NERD in Kendall Square to close out the cohort and give everyone a clean day to ship.\n\nFormat\n\nDoors at 9 AM, room is yours until 7 PM. No fixed agenda. Show up when you can, leave when you need to. We'll have a wall of project ideas, a few maintainers floating to unstuck people, and lunch around midday.\n\nWho should come\n\nCohort 1 members closing their Week 6 build, anyone who's been meaning to ship a side project, and folks new to the community who want to meet the Boston builders in person. Open to all skill levels.\n\nBring\n\nLaptop, charger, Cursor installed, and a project (or an open mind).",
+      "image": "/cursor-boston-logo.png",
+      "lumaUrl": "https://luma.com/cursor-4doe",
+      "lumaEventId": "cursor-4doe",
+      "lumaCheckoutEventId": "evt-I9VjCOaJrZx1wzk",
+      "lumaEmbedSrc": "https://luma.com/embed/event/evt-I9VjCOaJrZx1wzk/simple",
+      "registrationRequired": true,
+      "perks": [
+        "Lunch on us",
+        "Cohort 1 demo crowd",
+        "Maintainers on hand to unstick projects",
+        "Full-day workspace at Microsoft NERD"
+      ],
+      "topics": [
+        "Drop-in hacking",
+        "Cohort 1 Week 6 closeout",
+        "Pair-building with the community",
+        "Side-project shipping"
+      ],
+      "agenda": [
+        {
+          "time": "9:00 AM",
+          "title": "Doors open",
+          "description": "Arrive, settle in, grab coffee"
+        },
+        {
+          "time": "10:00 AM",
+          "title": "Light kickoff",
+          "description": "5-minute hello from Roger, then back to building"
+        },
+        {
+          "time": "12:30 PM",
+          "title": "Lunch",
+          "description": "Lunch arrives — keep building or step away for a beat"
+        },
+        {
+          "time": "5:00 PM",
+          "title": "Optional demos",
+          "description": "Show what you built (or where you got stuck)"
+        },
+        {
+          "time": "7:00 PM",
+          "title": "End",
+          "description": "Wrap and head out"
+        }
+      ],
+      "faq": [
+        {
+          "question": "Do I need to be in Cohort 1 to come?",
+          "answer": "No — open to anyone. Cohort 1 members get first dibs on demo time but the day is structured as a drop-in for the whole community."
+        },
+        {
+          "question": "Do I need to stay all day?",
+          "answer": "No. Show up when you can, leave when you need to."
+        },
+        {
+          "question": "What should I bring?",
+          "answer": "Laptop, charger, Cursor installed. A project to work on is ideal but not required — we'll have an ideas wall."
+        }
+      ],
+      "whatToBring": [
+        "Laptop",
+        "Charger",
+        "Cursor installed",
+        "A project (or curiosity)"
+      ],
+      "featured": false
+    },
+    {
       "id": "cursor-boston-pydata-2026",
       "slug": "cursor-boston-pydata-2026",
       "title": "Cursor Boston × PyData Data Science Hack",

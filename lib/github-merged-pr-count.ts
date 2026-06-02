@@ -7,6 +7,11 @@
 
 import { unstable_cache } from "next/cache";
 import { getGithubRepoPair } from "@/lib/github-recent-merged-prs";
+import {
+  getGithubApiHeaders as searchHeaders,
+  GITHUB_SEARCH_PER_PAGE as SEARCH_PER_PAGE,
+  GITHUB_SEARCH_MAX_PAGES as SEARCH_MAX_PAGES,
+} from "@/lib/github-api-helpers";
 import { fetchWithTimeout } from "@/lib/http-fetch";
 import { logger } from "@/lib/logger";
 
@@ -19,20 +24,6 @@ function sleep(ms: number): Promise<void> {
 type SearchIssueItem = {
   user?: { login?: string } | null;
 };
-
-const SEARCH_PER_PAGE = 100;
-/** GitHub search only returns the first 1000 matches. */
-const SEARCH_MAX_PAGES = 10;
-
-function searchHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-  };
-  const token = process.env.GITHUB_TOKEN;
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
-}
 
 /**
  * Uncached bulk merged-PR search. Exported so node scripts (which don't run

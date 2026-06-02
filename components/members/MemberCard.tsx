@@ -6,6 +6,7 @@
  */
 
 import Avatar from "@/components/Avatar";
+import { formatMonthYear } from "@/lib/format-helpers";
 import type { PublicMember } from "@/types/members";
 import { DiscordIcon, GitHubIcon } from "@/components/icons";
 import { BADGE_DEFINITIONS } from "@/lib/badges/definitions";
@@ -313,10 +314,7 @@ export function MemberCard({ member }: MemberCardProps) {
         {v?.showMemberSince && member.createdAt && typeof member.createdAt.toDate === "function" && (
           <span className="text-neutral-400 text-xs ml-auto">
             Member since{" "}
-            {member.createdAt.toDate().toLocaleDateString("en-US", {
-              month: "short",
-              year: "numeric",
-            })}
+            {formatMonthYear(member.createdAt.toDate())}
           </span>
         )}
       </div>

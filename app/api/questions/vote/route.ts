@@ -7,6 +7,7 @@
 
 // @contracts: questionsContract.myVotes (lib/api-schemas/questions.ts)
 import { NextRequest, NextResponse } from "next/server";
+import { getFirstValidationError } from "@/lib/api-response";
 import { getVerifiedUser } from "@/lib/server-auth";
 import {
   getQuestionsService,
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     const parsed = questionsContract.vote.body.safeParse(rawBody);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Invalid body" },
+        { error: getFirstValidationError(parsed.error, "Invalid body") },
         { status: 400 }
       );
     }

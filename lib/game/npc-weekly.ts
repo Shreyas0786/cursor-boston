@@ -32,6 +32,8 @@ import {
   weekStartIsoForRollover,
 } from "./turns";
 import { computeTileCapacity, makeSeededRng } from "./combat";
+import { GAME_COLLECTIONS as COLLECTIONS } from "./data-access/collections";
+import { sumStack } from "./unit-stack";
 import { getSpellForCasteAndType } from "./content";
 import { rebuildWorldSnapshotServer } from "./world-snapshot";
 import type {
@@ -41,13 +43,9 @@ import type {
   UnitType,
 } from "./types";
 
-const COLLECTIONS = {
-  PLAYERS: "game_players",
-  TILES: "game_tiles",
-} as const;
-
 const ATTACK_HARD_CAP = 15;
 
+/** @internal */
 export type NpcPersonaName =
   | "builder"
   | "raider"
@@ -85,9 +83,6 @@ function personaForUid(uid: string): Persona {
   return PERSONAS[PERSONA_NAMES[djb2(uid) % PERSONA_NAMES.length]!];
 }
 
-function sumStack(s: UnitStack): number {
-  return s.ground + s.siege + s.air;
-}
 
 interface AttackCandidate {
   sourceTileId: string;
@@ -502,6 +497,7 @@ async function applyGrantIfDue(args: {
   return { granted: true, player: next };
 }
 
+/** @internal */
 export interface NpcWeeklyPerPlayer {
   uid: string;
   displayName: string;
@@ -516,6 +512,7 @@ export interface NpcWeeklyPerPlayer {
   errorCount: number;
 }
 
+/** @internal */
 export interface NpcWeeklySummary {
   weekStartIso: string;
   scanned: number;
@@ -533,6 +530,7 @@ export interface NpcWeeklySummary {
   perPlayer: NpcWeeklyPerPlayer[];
 }
 
+/** @internal */
 export interface RunNpcWeeklyOptions {
   weekStartIso?: string;
   dryRun?: boolean;

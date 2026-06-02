@@ -20,7 +20,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { adminDbOrThrow } from "./data-access/db";
 import type {
   QueuedOrder,
   QueuedOrderKind,
@@ -33,24 +33,28 @@ const ORDER_QUEUE = "game_order_queue";
 
 // Errors -----------------------------------------------------------------
 
+/** @internal */
 export class QueuedOrderQueueFullError extends Error {
   constructor(public cap: number) {
     super(`Order queue full — cap is ${cap} pending orders.`);
     this.name = "QueuedOrderQueueFullError";
   }
 }
+/** @internal */
 export class QueuedOrderNotFoundError extends Error {
   constructor() {
     super("Queued order not found.");
     this.name = "QueuedOrderNotFoundError";
   }
 }
+/** @internal */
 export class QueuedOrderForbiddenError extends Error {
   constructor() {
     super("That order is not yours.");
     this.name = "QueuedOrderForbiddenError";
   }
 }
+/** @internal */
 export class QueuedOrderInvalidParamsError extends Error {
   constructor(message: string) {
     super(message);
@@ -58,11 +62,6 @@ export class QueuedOrderInvalidParamsError extends Error {
   }
 }
 
-function adminDbOrThrow(): Firestore {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin not initialized");
-  return db;
-}
 
 // Param validation -------------------------------------------------------
 
@@ -192,6 +191,7 @@ export async function cancelOrderServer(args: {
  * Mark a queued order as `executed` or `failed` inside the caller's
  * transaction. Used by the weekly-rollover executor.
  */
+/** @internal */
 export function markOrderResultInTx(args: {
   tx: Transaction;
   db: Firestore;
@@ -220,6 +220,7 @@ export function markOrderResultInTx(args: {
  * Kept here (not inlined into the executor) so the queued-orders unit
  * tests can mock the read independently of the dispatch logic.
  */
+/** @internal */
 export async function readQueuedOrdersForPlayer(
   db: Firestore,
   playerId: string

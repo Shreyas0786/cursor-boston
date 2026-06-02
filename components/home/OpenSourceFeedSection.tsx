@@ -12,16 +12,7 @@ import {
   fetchRecentMergedPullRequests,
   getGithubRepoWebBaseUrl,
 } from "@/lib/github-recent-merged-prs";
-
-function formatMergedDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+import { formatShortDate } from "@/lib/format-helpers";
 
 async function OpenSourceFeedContent() {
   const { prs, repoUrl, error } = await fetchRecentMergedPullRequests(8);
@@ -71,10 +62,10 @@ async function OpenSourceFeedContent() {
                 <span className="font-medium text-neutral-600 dark:text-neutral-300">
                   @{pr.authorLogin}
                 </span>
-                {formatMergedDate(pr.mergedAt) ? (
+                {formatShortDate(pr.mergedAt) ? (
                   <>
                     {" "}
-                    · merged {formatMergedDate(pr.mergedAt)}
+                    · merged {formatShortDate(pr.mergedAt)}
                   </>
                 ) : null}
               </p>
