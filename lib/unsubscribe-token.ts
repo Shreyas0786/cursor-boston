@@ -38,12 +38,24 @@ function resolveSecret(): string {
   );
 }
 
-const SECRET = resolveSecret();
+// Resolve the secret LAZILY, on first token operation, not at import time.
+// Module imports are hoisted above any `loadEnvConfig(...)` call in a script,
+// so an import-time `resolveSecret()` ran before the env was populated and
+// threw — which is exactly what pushed the send scripts into a fragile
+// `UNSUBSCRIBE_SECRET="$(... cut ...)"` shell prefix (whose kept quotes broke
+// ~1,900 unsubscribe links). Lazy + memoized resolution lets a script call
+// loadEnvConfig() first, then generate tokens with the correctly-loaded value,
+// with no env shell-prefix needed. Memoized so the HMAC key is stable per run.
+let cachedSecret: string | null = null;
+function getSecret(): string {
+  if (cachedSecret === null) cachedSecret = resolveSecret();
+  return cachedSecret;
+}
 
 /** Generate a deterministic HMAC token for an email address. */
 /** @internal */
 export function generateUnsubscribeToken(email: string): string {
-  return createHmac("sha256", SECRET)
+  return createHmac("sha256", getSecret())
     .update(email.toLowerCase().trim())
     .digest("hex");
 }
@@ -66,10 +78,8 @@ function tokenMatches(expected: string, candidate: string): boolean {
 // already-sent links would otherwise never verify. We accept them via a
 // secondary HMAC keyed on the quoted secret. This is intentionally narrow:
 // it only matches tokens signed with `"<secret>"`, nothing else.
-const LEGACY_QUOTED_SECRET = `"${SECRET}"`;
-
 function generateLegacyQuotedToken(email: string): string {
-  return createHmac("sha256", LEGACY_QUOTED_SECRET)
+  return createHmac("sha256", `"${getSecret()}"`)
     .update(email.toLowerCase().trim())
     .digest("hex");
 }
@@ -107,7 +117,7 @@ const WITHDRAW_NS = "withdraw-cohort";
 
 /** @internal */
 export function generateWithdrawToken(email: string, cohortId: string): string {
-  return createHmac("sha256", SECRET)
+  return createHmac("sha256", getSecret())
     .update(`${WITHDRAW_NS}:${cohortId}:${email.toLowerCase().trim()}`)
     .digest("hex");
 }
@@ -138,7 +148,7 @@ const PYDATA_WITHDRAW_NS = "withdraw-pydata-2026";
 
 /** @internal */
 export function generatePydataWithdrawToken(email: string): string {
-  return createHmac("sha256", SECRET)
+  return createHmac("sha256", getSecret())
     .update(`${PYDATA_WITHDRAW_NS}:${email.toLowerCase().trim()}`)
     .digest("hex");
 }

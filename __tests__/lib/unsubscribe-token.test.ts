@@ -47,40 +47,40 @@ afterEach(() => {
 });
 
 describe("unsubscribe token secret resolution", () => {
+  // The secret is resolved lazily (on first token op), not at import time, so
+  // the module loads cleanly and the fail-closed throw surfaces on first use.
   it("fails closed outside development and test when no token secret is configured", () => {
-    expect(() =>
-      loadTokenModule({
-        nodeEnv: "production",
-      })
-    ).toThrow(
+    const mod = loadTokenModule({ nodeEnv: "production" });
+    expect(() => mod.generateUnsubscribeToken("user@example.com")).toThrow(
       "UNSUBSCRIBE_SECRET must be configured; refusing to generate unsubscribe or withdraw tokens with a public fallback secret."
     );
   });
 
   it("fails closed for staging-like server environments without a token secret", () => {
-    expect(() =>
-      loadTokenModule({
-        nodeEnv: "staging",
-      })
-    ).toThrow("UNSUBSCRIBE_SECRET must be configured");
+    const mod = loadTokenModule({ nodeEnv: "staging" });
+    expect(() => mod.generateUnsubscribeToken("user@example.com")).toThrow(
+      "UNSUBSCRIBE_SECRET must be configured"
+    );
   });
 
   it("ignores NEXTAUTH_SECRET for this token concern", () => {
-    expect(() =>
-      loadTokenModule({
-        env: { NEXTAUTH_SECRET: UNIT_TEST_SECRET },
-        nodeEnv: "production",
-      })
-    ).toThrow("UNSUBSCRIBE_SECRET must be configured");
+    const mod = loadTokenModule({
+      env: { NEXTAUTH_SECRET: UNIT_TEST_SECRET },
+      nodeEnv: "production",
+    });
+    expect(() => mod.generateUnsubscribeToken("user@example.com")).toThrow(
+      "UNSUBSCRIBE_SECRET must be configured"
+    );
   });
 
   it("rejects configured secrets shorter than 32 bytes", () => {
-    expect(() =>
-      loadTokenModule({
-        env: { UNSUBSCRIBE_SECRET: "short-secret" },
-        nodeEnv: "production",
-      })
-    ).toThrow("UNSUBSCRIBE_SECRET must be at least 32 bytes");
+    const mod = loadTokenModule({
+      env: { UNSUBSCRIBE_SECRET: "short-secret" },
+      nodeEnv: "production",
+    });
+    expect(() => mod.generateUnsubscribeToken("user@example.com")).toThrow(
+      "UNSUBSCRIBE_SECRET must be at least 32 bytes"
+    );
   });
 
   it("uses a 32-byte UNSUBSCRIBE_SECRET in production", () => {
@@ -104,6 +104,22 @@ describe("unsubscribe token secret resolution", () => {
       nodeEnv: "development",
     });
     expect(inDevelopment.generateUnsubscribeToken("user@example.com")).toMatch(
+      /^[a-f0-9]{64}$/
+    );
+  });
+
+  it("resolves the secret lazily — env set AFTER import is still honored", () => {
+    // Reproduces the real-world script ordering: the module is imported first
+    // (imports are hoisted), and UNSUBSCRIBE_SECRET is populated afterwards
+    // (e.g. by loadEnvConfig). Lazy resolution must pick it up, not throw.
+    jest.resetModules();
+    process.env = { ...ORIGINAL_ENV };
+    delete process.env.UNSUBSCRIBE_SECRET;
+    setNodeEnv("production");
+    const mod = require("@/lib/unsubscribe-token") as UnsubscribeTokenModule;
+    // Env arrives only now, after the module is already loaded.
+    process.env.UNSUBSCRIBE_SECRET = UNIT_TEST_SECRET;
+    expect(mod.generateUnsubscribeToken("user@example.com")).toMatch(
       /^[a-f0-9]{64}$/
     );
   });
