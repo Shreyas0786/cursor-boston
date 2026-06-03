@@ -58,13 +58,36 @@ function tokenMatches(expected: string, candidate: string): boolean {
   return timingSafeEqual(expectedBytes, candidateBytes);
 }
 
-/** Verify that a token matches the expected HMAC for the email. */
+// Legacy/compat secret: two send scripts in early June 2026 (the cohort-1
+// Discord blast and the 2026-06-03 game digest) signed their unsubscribe
+// links with the secret value INCLUDING its surrounding double-quotes — the
+// send command extracted UNSUBSCRIBE_SECRET from .env.local with `cut`, which
+// keeps the quotes, while the runtime (and dotenv) strip them. Those ~1,900
+// already-sent links would otherwise never verify. We accept them via a
+// secondary HMAC keyed on the quoted secret. This is intentionally narrow:
+// it only matches tokens signed with `"<secret>"`, nothing else.
+const LEGACY_QUOTED_SECRET = `"${SECRET}"`;
+
+function generateLegacyQuotedToken(email: string): string {
+  return createHmac("sha256", LEGACY_QUOTED_SECRET)
+    .update(email.toLowerCase().trim())
+    .digest("hex");
+}
+
+/**
+ * Verify that a token matches the expected HMAC for the email.
+ *
+ * Primary check uses the correctly-loaded secret. As a backward-compatible
+ * fallback we also accept tokens signed with the quote-wrapped secret (see
+ * LEGACY_QUOTED_SECRET) so unsubscribe links from the early-June 2026 blasts
+ * keep working. Both comparisons are constant-time.
+ */
 export function verifyUnsubscribeToken(
   email: string,
   token: string
 ): boolean {
-  const expected = generateUnsubscribeToken(email);
-  return tokenMatches(expected, token);
+  if (tokenMatches(generateUnsubscribeToken(email), token)) return true;
+  return tokenMatches(generateLegacyQuotedToken(email), token);
 }
 
 /** Build a full unsubscribe URL for a given email. */
