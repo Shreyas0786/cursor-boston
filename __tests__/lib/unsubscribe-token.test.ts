@@ -180,6 +180,28 @@ describe("verifyUnsubscribeToken", () => {
     const token = generateUnsubscribeToken("user@example.com");
     expect(verifyUnsubscribeToken("other@example.com", token)).toBe(false);
   });
+
+  it("accepts a token signed with the quote-wrapped secret (early-June 2026 blast compat)", () => {
+    // The cohort-1 Discord blast and the 2026-06-03 game digest signed links
+    // with the secret value including its surrounding double-quotes, because
+    // the send command extracted it from .env.local with `cut` (quotes kept).
+    // Those already-sent links must still verify.
+    const { verifyUnsubscribeToken } = tokens();
+    const { createHmac } = require("crypto") as typeof import("crypto");
+    const legacyToken = createHmac("sha256", `"${UNIT_TEST_SECRET}"`)
+      .update("user@example.com")
+      .digest("hex");
+    expect(verifyUnsubscribeToken("user@example.com", legacyToken)).toBe(true);
+  });
+
+  it("does not accept a quoted-secret token for the wrong email", () => {
+    const { verifyUnsubscribeToken } = tokens();
+    const { createHmac } = require("crypto") as typeof import("crypto");
+    const legacyToken = createHmac("sha256", `"${UNIT_TEST_SECRET}"`)
+      .update("user@example.com")
+      .digest("hex");
+    expect(verifyUnsubscribeToken("other@example.com", legacyToken)).toBe(false);
+  });
 });
 
 describe("buildUnsubscribeUrl", () => {
